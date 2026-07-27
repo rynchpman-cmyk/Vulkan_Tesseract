@@ -250,6 +250,88 @@ self-error, and a cellwise hard-classifier crossing. The tracked record is
 `tesseract_neural_phase_riemann_results.json`; measurements and scope are in
 [the frozen-neural phase Riemann report](../FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md).
 
+### 13. GPU-resident Theory 3.3 vertical slice
+
+```powershell
+.\run_vulkan_theory33.ps1
+```
+
+This campaign keeps the seven-field flat 1D Carter material state on Vulkan
+through primitive recovery, analytic-M1 evaluation, Rusanov fluxes, the DLM
+canonical-momentum path product, entropy projection, and SSP-RK3. It compares
+16/32/64-cell device results with an independent float64 production oracle
+and requires zero host tensor reads during evolution. The tracked record is
+`vulkan_theory33_results.json`; implementation boundaries and measurements
+are in
+[the GPU-resident Theory 3.3 report](../VULKAN_THEORY33_PORT_REPORT.md).
+
+### 14. GPU-resident frozen-neural phase front
+
+```powershell
+.\run_vulkan_frozen_neural.ps1
+```
+
+This promotes the generated, digest-locked two-phase master into device
+primitive recovery, Carter stress/flux construction, canonical momentum, and
+all SSP-RK3 stages. The 16/32/64-cell boosted phase contact is evolved long
+enough to move the hard front through grid cells. Qualification requires
+float32/float64 physical parity, cellwise phase agreement away from the
+nonsmooth boundary, dynamic branch changes, positive physical margins,
+periodic number balance, and no host reads between snapshots. The tracked
+record is `vulkan_frozen_neural_results.json`; see
+[the GPU frozen-neural report](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md).
+
+### 15. GPU WENO5-Z and positivity preservation
+
+```powershell
+.\run_vulkan_weno.ps1
+```
+
+The campaign measures the Vulkan WENO interface order, compares smooth
+analytic-M1 evolution against an independent float64 implementation, forces
+the conservative face limiter active in a discontinuous torture state, and
+evolves a moving frozen-neural phase front. The tracked record is
+`vulkan_weno_results.json`; see
+[the GPU WENO report](../VULKAN_WENO_PORT_REPORT.md).
+
+### 16. GPU numerical Carter eigensystem
+
+```powershell
+.\run_vulkan_carter_eigensystem.ps1
+```
+
+This compares device eigenvalues with an independent float64 restricted
+flux/path symbol, audits causal speeds, eigenpair and inverse-basis residuals,
+then evolves smooth, discontinuous, and learned-phase states with
+branch-aware characteristic WENO. The tracked record is
+`vulkan_carter_eigensystem_results.json`; see
+[the GPU Carter eigensystem report](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md).
+
+### 17. GPU full Carter sources and CCZ4 geometry
+
+```powershell
+.\run_vulkan_full_carter_ccz4.ps1
+```
+
+This runs independent float64 parity checks for the mixed-vector
+stress/implicit-drag layer, the curved physical nine-field Carter principal
+map and complete `9 x 9` eigensystem in every spatial direction, and packed
+CCZ4 algebraic projection, physical geometry, and matter-source injection.
+The tracked record is `vulkan_full_carter_ccz4_results.json`; see
+[the full Carter/CCZ4 Vulkan report](../VULKAN_FULL_CARTER_CCZ4_REPORT.md).
+
+### 18. Resident multidimensional Carter/CCZ4 evolution
+
+```powershell
+.\run_vulkan_multidimensional.ps1
+```
+
+This runs the curved nine-variable recovery, multidirectional interface/path
+assembly, implicit Strang drag, recovered total matter coupling, and complete
+periodic derivative CCZ4 operator on one resident Vulkan grid. The tracked
+record is `vulkan_multidimensional_results.json`; see
+[the multidimensional Vulkan evolution report](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
+
 ## Retraining
 
 ```powershell

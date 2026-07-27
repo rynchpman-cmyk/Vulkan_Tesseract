@@ -64,6 +64,13 @@ python .\test_hybrid.py
 .\run_conditioned_literal.ps1 -FiniteDifferenceWeights 4
 ```
 
+For resident PDE or CCZ4 shader changes, additionally run:
+
+```powershell
+.\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
+python -m pytest tests\nr tests\test_artifacts.py -q
+```
+
 ## Pull requests
 
 Describe:

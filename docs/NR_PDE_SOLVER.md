@@ -17,6 +17,11 @@ The backend is a one-way source transplant into this public repository. It
 has no runtime, build, test, data, or source dependency on another project.
 All public development occurs inside `tesseract_nr/`.
 
+The CPU solver remains the transparent independent oracle. Its active
+multidimensional Carter/CCZ4 execution path is now also implemented on
+Slang/Vulkan; see the
+[multidimensional Vulkan evolution report](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
+
 ## State contract
 
 The method-of-lines state contains 24 component-leading arrays, representing

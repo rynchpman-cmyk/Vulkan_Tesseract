@@ -12,6 +12,7 @@ The project intentionally has four complementary representations:
 | Physical Slang | `theory33_hybrid.slang` | Analytic M1 constitutive and native reverse kernel |
 | Slang | `carter_tesseract_*.slang` | Generated native Vulkan forward and reverse kernels |
 | NR CPU | `tesseract_nr/` | Coupled CCZ4, conservative matter, two-current, and mixed-vector PDE oracle |
+| NR Vulkan | `tesseract_nr_gpu.slang` | Resident multidimensional Carter recovery/transport/source and derivative CCZ4 evolution |
 
 `migrate_full_slang.py` mechanically imports the GLSL body, specializes model
 constants from a portable JSON artifact, and appends the differentiable and
@@ -120,6 +121,48 @@ Exposes all 16 tesseract vertices for visualization. Each vertex reports:
   validation on Vulkan.
 - `visualize_tesseract.py` performs batched Vulkan atlas capture and renders
   the interactive instrument.
+- `tesseract_nr/vulkan_backend.py` owns resident device buffers and submits
+  the Theory 3.3 recovery, flux/path, and SSP-RK3 dispatch graph without
+  per-stage readback. Its constitutive mode selects either analytic M1 or the
+  digest-locked qualified frozen closure.
+- `tesseract_nr_gpu.slang` imports the generated qualified model and carries
+  a hard phase tape through primitive recovery: each Newton/Jacobian solve
+  uses one fixed branch, with explicit transition iterations at recovered
+  classifier crossings.
+- The resident interface graph constructs both componentwise WENO5-Z and
+  piecewise-constant Rusanov fluxes. A cellwise forward-Euler admissibility
+  audit produces \(\theta\); taking the minimum \(\theta\) on both sides of
+  each face conservatively blends the high-order flux back to the monotone
+  control flux.
+- The 1D Carter characteristic path numerically forms
+  \((F_{,p}-B_{,p})U_{,p}^{-1}\) for the five independent material fields.
+  Shifted QR supplies real speeds, inverse iteration supplies right modes,
+  and a pivoted inverse supplies the left basis. Learned phase faces select
+  one qualified physical-side basis rather than averaging across the hard
+  constitutive discontinuity.
+- The widened local Vulkan ABI carries the full physical nine-field block
+  \((D_N,D_D,S_i,E,P_i^D)\). It evaluates curved fluxes and the literal path
+  symbol in all three directions, using active-block QR deflation and inverse
+  iteration for complete `9 x 9` left/right bases.
+- Mixed-vector stress is evaluated in separate A/B device passes and combined
+  on-device. The implicit nine-variable drag solve conserves material
+  density/energy-momentum while converting counterflow into entropy.
+- The packed 31-component CCZ4 geometry ABI projects `det(gt)=1` and
+  `tr(At)=0`, reconstructs physical `h_ij` and `K_ij`, and injects the full
+  Eulerian Carter stress into the algebraic matter-source terms.
+- `VulkanTesseractCoupledBackend` owns the curved multidimensional Carter
+  and CCZ4 state together. It performs geometry half-steps around the full
+  Carter SSP-RK3/implicit-drag step, refreshes curved primitive recovery and
+  total Eulerian stress at every geometry stage, and keeps all active grids
+  x-fastest and resident.
+- The CCZ4 device operator contains periodic centered-FD2 Christoffels,
+  physical Ricci curvature, lapse Hessians, covariant Z derivatives,
+  advection, gauge drivers, and constraint damping. Algebraic projection is
+  applied between its SSP-RK3 stages.
+- `tesseract_nr/vulkan_validation.py` supplies an independent float64
+  material oracle for both constitutive modes and enforces CPU/GPU parity,
+  branch agreement away from the nonsmooth surface, dynamic switching, and
+  zero host reads during evolution.
 
 ## Model artifacts
 

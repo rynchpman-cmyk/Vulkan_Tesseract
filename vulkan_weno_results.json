@@ -1,0 +1,107 @@
+{
+  "backend": "Slang/Vulkan",
+  "frozen_neural_phase_ladder": [
+    {
+      "host_reads_after_evolution": 1,
+      "host_reads_before_evolution": 1,
+      "minimum_positivity_theta": 1.0,
+      "phase_cells_changed_from_initial": 2,
+      "phase_disagreements_with_cpu": 0,
+      "physical_state_relative_error": 5.4662074292407e-07,
+      "points": 16,
+      "recovery_failures": 0
+    },
+    {
+      "host_reads_after_evolution": 1,
+      "host_reads_before_evolution": 1,
+      "minimum_positivity_theta": 1.0,
+      "phase_cells_changed_from_initial": 5,
+      "phase_disagreements_with_cpu": 0,
+      "physical_state_relative_error": 6.738599471155243e-07,
+      "points": 32,
+      "recovery_failures": 0
+    }
+  ],
+  "interface_accuracy": {
+    "maximum_errors": [
+      5.625523183958384e-06,
+      1.540030580924473e-07,
+      5.7046875140409625e-09
+    ],
+    "observed_orders": [
+      5.1909563714341616,
+      4.754667326979611
+    ],
+    "qualification": {
+      "error_decreases": true,
+      "pre_roundoff_order_exceeds_4_5": true
+    },
+    "resolutions": [
+      8,
+      16,
+      32
+    ]
+  },
+  "low_order_control": "piecewise_constant_rusanov",
+  "positivity": "cell forward-Euler admissibility with minimum adjacent face blending",
+  "positivity_torture": {
+    "baryon_balance_error": 1.147168324777681e-07,
+    "carrier_balance_error": 1.2676940158717898e-07,
+    "cfl": 0.8,
+    "cpu_minimum_theta": 0.48199068292580355,
+    "gpu_minimum_theta": 0.48180511593818665,
+    "minimum_baryon_conserved": 0.06129187345504761,
+    "minimum_carrier_conserved": 0.0029577563982456923,
+    "physical_state_relative_error": 6.270660715636536e-07,
+    "points": 32,
+    "positivity_floor_factor": 280000.0,
+    "recovery_failures": 0
+  },
+  "qualification": {
+    "device_resident_between_snapshots": true,
+    "interface_error_decreases": true,
+    "interface_pre_roundoff_order_exceeds_4_5": true,
+    "phase_cpu_gpu_parity": true,
+    "phase_crossing_exercised": true,
+    "smooth_cpu_gpu_parity": true,
+    "smooth_number_balance": true,
+    "smooth_recovery_valid": true,
+    "smooth_unlimited_when_admissible": true,
+    "torture_conservation": true,
+    "torture_cpu_gpu_parity": true,
+    "torture_limiter_activates": true,
+    "torture_recovery_and_positivity": true
+  },
+  "qualified": true,
+  "reconstruction": "componentwise_weno5_z",
+  "schema": "vulkan-tesseract.weno-positivity.v1",
+  "smooth_ladder": [
+    {
+      "baryon_relative_balance_error": 1.219483761885266e-07,
+      "carrier_relative_balance_error": 3.5168037378773107e-07,
+      "host_reads_after_evolution": 0,
+      "minimum_positivity_theta": 1.0,
+      "physical_state_relative_error": 9.379470313937463e-08,
+      "points": 16,
+      "recovery_failures": 0
+    },
+    {
+      "baryon_relative_balance_error": 1.219483761885266e-07,
+      "carrier_relative_balance_error": 1.6543448764494652e-07,
+      "host_reads_after_evolution": 0,
+      "minimum_positivity_theta": 1.0,
+      "physical_state_relative_error": 1.752414241835827e-07,
+      "points": 32,
+      "recovery_failures": 0
+    },
+    {
+      "baryon_relative_balance_error": 1.219483761885266e-07,
+      "carrier_relative_balance_error": 3.5168037378773107e-07,
+      "host_reads_after_evolution": 0,
+      "minimum_positivity_theta": 1.0,
+      "physical_state_relative_error": 2.0608316525748782e-07,
+      "points": 64,
+      "recovery_failures": 0
+    }
+  ]
+}

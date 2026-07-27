@@ -1,20 +1,20 @@
 cff-version: 1.2.0
 message: "If you use this software in research, please cite it using the metadata below."
-title: "Carter/KKT Tesseract"
+title: "Vulkan Tesseract"
 abstract: >-
-  A hard-constrained differentiable Carter/KKT Vulkan simulator evolved from
-  a parity-gated scalar recurrence, with piecewise-constant hard decisions,
-  progressive full-physics unrolling, Lyapunov-conditioned dynamics, and a
-  coupled CCZ4 two-current numerical-relativity PDE reference backend.
+  A standalone GPU-resident neural spacetime simulator with hard constitutive
+  decisions, curved Carter multifluid recovery, mixed-vector stress,
+  multidirectional transport, and coupled derivative-containing CCZ4
+  evolution in Slang and Vulkan.
 type: software
 authors:
   - name: "rynchpman-cmyk"
     website: "https://github.com/rynchpman-cmyk"
-repository-code: "https://github.com/rynchpman-cmyk/carter-kkt-tesseract"
-url: "https://github.com/rynchpman-cmyk/carter-kkt-tesseract"
+repository-code: "https://github.com/rynchpman-cmyk/Vulkan_Tesseract"
+url: "https://github.com/rynchpman-cmyk/Vulkan_Tesseract"
 license: Apache-2.0
 version: 0.1.0
-date-released: 2026-07-24
+date-released: 2026-07-27
 keywords:
   - automatic differentiation
   - differentiable physics

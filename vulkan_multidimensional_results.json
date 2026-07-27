@@ -1,0 +1,45 @@
+{
+  "backend": "Slang/Vulkan",
+  "ccz4_derivatives": "periodic centered FD2",
+  "constitutive_model": "qualified_frozen",
+  "dt": 0.0002,
+  "metrics": {
+    "all_outputs_finite": true,
+    "baryon_balance_error": 7.217209231468071e-07,
+    "carrier_balance_error": 9.979121387004852e-07,
+    "ccz4_vacuum_maximum_absolute_error": 2.3245811462402344e-06,
+    "ccz4_vacuum_rms_error": 2.2946322471860376e-07,
+    "ccz4_vacuum_worst_component": 19,
+    "ccz4_vacuum_worst_cpu_value": 0.5082589387893677,
+    "ccz4_vacuum_worst_gpu_value": 0.5082612633705139,
+    "entropy_change": 1.9416213035583496e-05,
+    "final_maximum_recovery_residual": 4.3033045926677005e-07,
+    "host_reads_during_evolution": 0,
+    "initial_maximum_recovery_residual": 1.3553431987833875e-10,
+    "invalid_final_recoveries": 0,
+    "maximum_projection_determinant_residual": 0.0,
+    "maximum_projection_trace_a_residual": 7.275957614183426e-12,
+    "minimum_absolute_switching_margin": 0.0005045174621045589,
+    "minimum_final_lapse": 0.9939981698989868,
+    "tracer_balance_error": 7.333615680447196e-07
+  },
+  "qualification": {
+    "ccz4_projection_constraints_hold": true,
+    "curved_nine_variable_recovery_valid": true,
+    "derivative_ccz4_matches_fd2_cpu": true,
+    "frozen_switching_margin_remains_resolved": true,
+    "full_stack_outputs_are_finite": true,
+    "full_stack_remains_device_resident": true,
+    "periodic_transport_balances_conserved_scalars": true,
+    "strang_drag_is_entropy_producing": true
+  },
+  "qualified": true,
+  "schema": "vulkan-tesseract.multidimensional-full-stack.v1",
+  "shape": [
+    8,
+    8
+  ],
+  "spatial_operator": "multidirectional Rusanov plus midpoint Carter DLM path",
+  "steps": 2,
+  "time_integrator": "CCZ4 half-step / Carter SSP-RK3 with implicit drag / CCZ4 half-step"
+}

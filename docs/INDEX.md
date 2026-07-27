@@ -48,6 +48,24 @@ explains the final system from the inside out.
 18. [Frozen-neural phase Riemann frontier](../FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md)
     — a qualified conserved-state learned-phase corridor and converged
     16/32/64/128-cell discontinuity with dynamic hard switching.
+19. [GPU-resident Theory 3.3 port](../VULKAN_THEORY33_PORT_REPORT.md)
+    — the first no-readback Vulkan PDE vertical slice with device recovery,
+    Carter flux/path evolution, SSP-RK3, and float64 CPU parity.
+20. [GPU-resident frozen-neural port](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md)
+    — digest-locked neural constitutive recovery and a dynamically moving
+    hard phase tape with cellwise CPU/Vulkan agreement.
+21. [GPU WENO and positivity port](../VULKAN_WENO_PORT_REPORT.md)
+    — fifth-order device interfaces and conservative face-compatible
+    admissibility limiting.
+22. [GPU Carter eigensystem](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md)
+    — numerical flux/path symbols, audited real modes, and branch-aware
+    characteristic WENO on the resident physical block.
+23. [GPU full Carter sources and CCZ4 geometry](../VULKAN_FULL_CARTER_CCZ4_REPORT.md)
+    — mixed-vector stress, implicit drag, curved three-direction nine-field
+    eigensystems, and packed CCZ4 matter coupling.
+24. [GPU multidimensional Carter/CCZ4 evolution](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
+    — curved resident recovery, multidirectional flux/path assembly, nested
+    Strang scheduling, and the derivative-containing CCZ4 vacuum operator.
 
 Measured outputs are preserved separately:
 
@@ -61,3 +79,9 @@ Measured outputs are preserved separately:
 - [Neural spacetime frontier](../NEURAL_SPACETIME_FRONTIER_REPORT.md)
 - [Full Carter eigensystem and Riemann frontier](../FULL_CARTER_RIEMANN_REPORT.md)
 - [Frozen-neural phase Riemann frontier](../FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md)
+- [GPU-resident Theory 3.3 port](../VULKAN_THEORY33_PORT_REPORT.md)
+- [GPU-resident frozen-neural port](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md)
+- [GPU WENO and positivity port](../VULKAN_WENO_PORT_REPORT.md)
+- [GPU Carter eigensystem](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md)
+- [GPU full Carter sources and CCZ4 geometry](../VULKAN_FULL_CARTER_CCZ4_REPORT.md)
+- [GPU multidimensional Carter/CCZ4 evolution](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)

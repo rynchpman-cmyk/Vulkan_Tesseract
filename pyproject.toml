@@ -3,9 +3,9 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "carter-kkt-tesseract"
+name = "vulkan-tesseract"
 version = "0.1.0"
-description = "Differentiable Carter/KKT dynamics and a Theory 3.3 NR PDE solver"
+description = "GPU-resident neural Carter/CCZ4 spacetime simulation in Slang and Vulkan"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -13,6 +13,11 @@ license-files = ["LICENSE", "NOTICE"]
 dependencies = [
     "numpy>=2.3,<3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rynchpman-cmyk/Vulkan_Tesseract"
+Repository = "https://github.com/rynchpman-cmyk/Vulkan_Tesseract"
+Issues = "https://github.com/rynchpman-cmyk/Vulkan_Tesseract/issues"
 
 [project.optional-dependencies]
 training = [
@@ -41,6 +46,13 @@ py-modules = [
     "run_tesseract_nr_shocks",
     "run_tesseract_carter_riemann",
     "run_tesseract_neural_phase_riemann",
+    "run_vulkan_theory33",
+    "run_vulkan_frozen_neural",
+    "run_vulkan_weno",
+    "run_vulkan_carter_eigensystem",
+    "run_vulkan_mixed_sources",
+    "run_vulkan_full_carter_ccz4",
+    "run_vulkan_multidimensional",
     "run_theory33_experiments",
     "run_theory33_advanced",
     "run_theory33_hybrid",

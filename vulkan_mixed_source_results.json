@@ -1,0 +1,64 @@
+{
+  "backend": "Slang/Vulkan",
+  "comoving_primitive_error": 0.0,
+  "conserved_block": "D_N,D_D,S_x,S_y,S_z,E,P_D_x,P_D_y,P_D_z,D_N*s,D_N*Y",
+  "dt": 0.1,
+  "mode_audits": [
+    {
+      "constitutive_model": "analytic_m1",
+      "cpu_phase_crossings": 0,
+      "gpu_phase_crossings": 0,
+      "invalid_drag_points": 0,
+      "maximum_composed_state_absolute_error": 4.2386243542802404e-08,
+      "maximum_cpu_drag_residual": 4.4703032457956105e-12,
+      "maximum_drag_primitive_absolute_error": 3.7616775485638243e-06,
+      "maximum_dragged_state_absolute_error": 3.246753582930584e-07,
+      "maximum_gpu_drag_residual": 3.1700126328360057e-06,
+      "maximum_gpu_material_conservation_error": 2.9802322387695312e-08,
+      "maximum_relative_gamma_excess_ratio": 0.0,
+      "maximum_vector_stress_absolute_error": 8.381964835754707e-09,
+      "minimum_entropy_increase": 6.580352783203125e-05
+    },
+    {
+      "constitutive_model": "qualified_frozen",
+      "cpu_phase_crossings": 12,
+      "gpu_phase_crossings": 12,
+      "invalid_drag_points": 0,
+      "maximum_composed_state_absolute_error": 4.447067755708467e-08,
+      "maximum_cpu_drag_residual": 9.251164106155547e-16,
+      "maximum_drag_primitive_absolute_error": 3.561008374397545e-06,
+      "maximum_dragged_state_absolute_error": 3.571916925848573e-07,
+      "maximum_gpu_drag_residual": 3.34612445840321e-06,
+      "maximum_gpu_material_conservation_error": 2.9802322387695312e-08,
+      "maximum_relative_gamma_excess_ratio": 0.0,
+      "maximum_vector_stress_absolute_error": 8.381964835754707e-09,
+      "minimum_entropy_increase": 5.936622619628906e-05
+    }
+  ],
+  "points": 12,
+  "primitive_block": [
+    "log_n",
+    "entropy",
+    "q_N_x",
+    "q_N_y",
+    "q_N_z",
+    "log_d",
+    "q_D_x",
+    "q_D_y",
+    "q_D_z"
+  ],
+  "qualification": {
+    "all_drag_solves_valid": true,
+    "comoving_threshold_is_exactly_quiet": true,
+    "drag_is_entropy_producing": true,
+    "full_state_composition_matches_cpu": true,
+    "implicit_drag_matches_cpu": true,
+    "material_energy_momentum_conserved": true,
+    "mixed_vector_stress_matches_cpu": true,
+    "phase_transition_tape_matches_cpu": true,
+    "stiff_relative_motion_relaxes": true
+  },
+  "qualified": true,
+  "relaxation_time": 0.01,
+  "schema": "vulkan-tesseract.mixed-sources.v1"
+}

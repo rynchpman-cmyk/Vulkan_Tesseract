@@ -1,0 +1,132 @@
+{
+  "backend": "Slang/Vulkan",
+  "device_eigensolver": "shifted QR eigenvalues plus inverse-iteration right vectors",
+  "frozen_neural_phase_ladder": [
+    {
+      "host_reads_after_evolution": 1,
+      "host_reads_before_evolution": 1,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 1.5239839967762236e-06,
+      "maximum_speed": 0.9849807620048523,
+      "phase_boundary_faces": 2,
+      "phase_cells_changed_from_initial": 2,
+      "phase_disagreements_with_cpu": 0,
+      "physical_state_relative_error": 5.638853304172531e-07,
+      "points": 16,
+      "recovery_failures": 0
+    },
+    {
+      "host_reads_after_evolution": 1,
+      "host_reads_before_evolution": 1,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 2.478559053997742e-06,
+      "maximum_speed": 0.9850208163261414,
+      "phase_boundary_faces": 2,
+      "phase_cells_changed_from_initial": 6,
+      "phase_disagreements_with_cpu": 0,
+      "physical_state_relative_error": 9.632082238536208e-07,
+      "points": 32,
+      "recovery_failures": 0
+    }
+  ],
+  "physical_block": "five-field flat-1D Carter conserved principal system",
+  "qualification": {
+    "basis_residuals_and_conditioning_valid": true,
+    "branch_aware_face_selection_matches": true,
+    "cpu_gpu_eigenvalues_match": true,
+    "device_resident_between_snapshots": true,
+    "dynamic_phase_crossing_exercised": true,
+    "neural_phase_characteristic_parity": true,
+    "shock_characteristic_parity": true,
+    "smooth_characteristic_parity": true,
+    "symbols_real_and_causal": true
+  },
+  "qualified": true,
+  "reconstruction": "branch-aware_carter_characteristic_weno5_z",
+  "schema": "vulkan-tesseract.carter-eigensystem.v1",
+  "shock_ladder": [
+    {
+      "baryon_balance_error": 5.735841623888405e-08,
+      "carrier_balance_error": 5.593412018278787e-08,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 3.2160462524188915e-06,
+      "maximum_speed": 0.9867503046989441,
+      "physical_state_relative_error": 4.420422088293834e-07,
+      "points": 16,
+      "recovery_failures": 0
+    },
+    {
+      "baryon_balance_error": 5.915539906808931e-07,
+      "carrier_balance_error": 1.1186824039333132e-07,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 1.5371571180367027e-06,
+      "maximum_speed": 0.9868900179862976,
+      "physical_state_relative_error": 4.758919927887755e-07,
+      "points": 32,
+      "recovery_failures": 0
+    }
+  ],
+  "smooth_ladder": [
+    {
+      "host_reads_after_evolution": 0,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 0.00045968859922140837,
+      "maximum_speed": 0.9584200382232666,
+      "minimum_positivity_theta": 1.0,
+      "physical_state_relative_error": 1.0322842667444885e-07,
+      "points": 16,
+      "recovery_failures": 0
+    },
+    {
+      "host_reads_after_evolution": 0,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 0.0005013143527321517,
+      "maximum_speed": 0.9585149884223938,
+      "minimum_positivity_theta": 1.0,
+      "physical_state_relative_error": 1.7287510088132667e-07,
+      "points": 32,
+      "recovery_failures": 0
+    },
+    {
+      "host_reads_after_evolution": 0,
+      "invalid_eigensystems": 0,
+      "maximum_eigenpair_residual": 0.0007671843050047755,
+      "maximum_speed": 0.9585089683532715,
+      "minimum_positivity_theta": 1.0,
+      "physical_state_relative_error": 2.042244204937301e-07,
+      "points": 64,
+      "recovery_failures": 0
+    }
+  ],
+  "symbol": "(F_,p - B_,p) @ inverse(U_,p)",
+  "symbol_audits": [
+    {
+      "constitutive_model": "analytic_m1",
+      "cpu_phase_boundary_faces": 0,
+      "gpu_invalid_faces": 0,
+      "gpu_phase_boundary_faces": 0,
+      "maximum_cpu_condition": 262.61189644528935,
+      "maximum_cpu_imaginary_part": 0.0,
+      "maximum_eigenvalue_error": 0.0003697763419193145,
+      "maximum_gpu_condition_estimate": 347.8013916015625,
+      "maximum_gpu_eigenpair_residual": 0.0001278748968616128,
+      "maximum_gpu_inverse_residual": 1.4126367204880808e-06,
+      "maximum_gpu_speed": 0.9584292769432068,
+      "minimum_gpu_separation": 0.3297916054725647
+    },
+    {
+      "constitutive_model": "qualified_frozen",
+      "cpu_phase_boundary_faces": 2,
+      "gpu_invalid_faces": 0,
+      "gpu_phase_boundary_faces": 2,
+      "maximum_cpu_condition": 255.58611235292176,
+      "maximum_cpu_imaginary_part": 0.0,
+      "maximum_eigenvalue_error": 0.00015462533634690023,
+      "maximum_gpu_condition_estimate": 338.6690368652344,
+      "maximum_gpu_eigenpair_residual": 1.4984791505412431e-06,
+      "maximum_gpu_inverse_residual": 8.678110816617846e-07,
+      "maximum_gpu_speed": 0.9850208163261414,
+      "minimum_gpu_separation": 0.32274627685546875
+    }
+  ]
+}

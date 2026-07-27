@@ -1,15 +1,22 @@
-# Carter–KKT Tesseract
+# Vulkan Tesseract
 
-**A hard-constrained, differentiable Vulkan simulator that grew out of the
-operation \(a \oplus b=\tfrac32(a+b)\).**
+**Turn your gaming PC into a neural spacetime simulator.**
+
+Vulkan Tesseract is a standalone GPU-resident neural-spacetime project: a
+hard-constrained, differentiable simulator that grew out of the operation
+\(a \oplus b=\tfrac32(a+b)\). This repository contains the complete
+Carter/KKT derivation, CPU numerical-relativity oracle, trained artifacts,
+reports, and validation history together with the active Theory 3.3
+Carter/CCZ4 evolution stack in Slang/Vulkan.
 
 ![Tesseract active neural spacetime dashboard](tesseract_full_stack_dashboard.png)
 
 The project combines a parity-gated scalar recurrence, an exact 81-candidate
 box-KKT solve, Carter-style multifluid constitutive structure, a learned scalar
 master function \(\Lambda_\phi\), reverse-mode differentiation through time,
-intrinsic Lyapunov conditioning, and a standalone coupled
-CCZ4/GRHD/two-current numerical-relativity PDE backend.
+intrinsic Lyapunov conditioning, a standalone float64
+CCZ4/GRHD/two-current numerical-relativity reference backend, and a resident
+multidimensional Vulkan Carter/CCZ4 evolution backend.
 
 The conditioned literal map has been validated for **128 undamped Vulkan
 steps** with:
@@ -81,10 +88,31 @@ flowchart LR
   characteristic audit.
 - A full-stack neural-spacetime observatory plus the original interactive
   Vulkan phase-space and tesseract instrument.
+- A float64 CPU numerical-relativity oracle with CCZ4 geometry, conservative
+  matter, two-current Carter physics, mixed vectors, shocks, constrained
+  initial data, and continuum ladders.
+- A resident multidimensional Vulkan solver with curved nine-variable
+  recovery, three-direction flux/path assembly, implicit Strang drag,
+  recovered total matter stress, and the derivative-containing CCZ4 vacuum
+  operator.
 
 ## Quick start
 
 The project currently targets Windows PowerShell with a Vulkan-capable GPU.
+
+### GPU-resident neural spacetime
+
+Run the current end-to-end Vulkan milestone with:
+
+```powershell
+.\run_vulkan_multidimensional.ps1
+```
+
+The tracked `8 x 8` frozen-neural campaign advances the curved Carter matter
+and derivative CCZ4 equations together, performs no host readbacks during
+evolution, and matches the independent float64 CCZ4 FD2 oracle to
+\(2.33\times10^{-6}\). See the
+[multidimensional evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
 
 ### Interactive visualization
 
@@ -274,6 +302,86 @@ causality and convexity, and dynamically switches four cells at the finest
 level while successive-grid error decreases. See the
 [frozen-neural phase Riemann report](FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md).
 
+Run the first completely GPU-resident Theory 3.3 PDE slice with:
+
+```powershell
+.\run_vulkan_theory33.ps1
+```
+
+Primitive recovery, analytic-M1 constitutive physics, Carter fluxes, the
+canonical-momentum path product, entropy projection, and every SSP-RK3 stage
+remain on Vulkan with zero host reads during evolution. The tracked
+16/32/64-cell campaign agrees with the independent float64 CPU material
+oracle to at most \(2.01\times10^{-7}\) in relative physical-state norm. See
+the [GPU-resident Theory 3.3 report](VULKAN_THEORY33_PORT_REPORT.md).
+
+Promote the digest-locked frozen-neural closure and its hard phase tape into
+the same resident solver with:
+
+```powershell
+.\run_vulkan_frozen_neural.ps1
+```
+
+The classifier is frozen inside every Newton/Jacobian solve and reclassified
+only between recovery transition iterations. The boosted learned-phase
+contact moves across the grid, exercises dynamic hard-branch changes, and is
+checked cellwise against the independent float64 CPU closure without stage
+readback. See the
+[GPU frozen-neural port report](VULKAN_FROZEN_NEURAL_PORT_REPORT.md).
+
+Run the conservative WENO5-Z and positivity-preservation qualification with:
+
+```powershell
+.\run_vulkan_weno.ps1
+```
+
+This adds fifth-order componentwise interface reconstruction, a first-order
+Rusanov control flux, forward-Euler cell admissibility factors, and
+minimum-adjacent face blending. The limiter is conservative and is exercised
+by a tracked discontinuous torture state. See the
+[GPU WENO port report](VULKAN_WENO_PORT_REPORT.md).
+
+Run the numerical Carter flux/path eigensystem and branch-aware
+characteristic reconstruction with:
+
+```powershell
+.\run_vulkan_carter_eigensystem.ps1
+```
+
+The device forms the five-field restricted Carter symbol from centered
+primitive Jacobians, extracts a real basis with shifted QR and inverse
+iteration, audits the left/right inverse, and freezes one physical-side basis
+across learned phase-boundary faces. See the
+[GPU Carter eigensystem report](VULKAN_CARTER_EIGENSYSTEM_REPORT.md).
+
+Promote the local physics contract to mixed three-vector sources, the curved
+multidirectional nine-field Carter block, and packed CCZ4 geometry with:
+
+```powershell
+.\run_vulkan_full_carter_ccz4.ps1
+```
+
+This campaign qualifies the implicit entropy-producing drag solve, curved
+mixed-Proca stress, all three complete `9 x 9` Carter flux/path
+eigensystems, CCZ4 determinant/tracefree projection, physical geometry, and
+matter-source injection against independent float64 references. See the
+[full Carter/CCZ4 Vulkan report](VULKAN_FULL_CARTER_CCZ4_REPORT.md).
+
+Run the complete resident multidimensional Carter/CCZ4 evolution with:
+
+```powershell
+.\run_vulkan_multidimensional.ps1
+```
+
+This closes the local-to-grid boundary: full curved primitive recovery,
+multidirectional flux/path RHS assembly, nested Strang drag/geometry
+scheduling, recovered total matter stress, and the derivative-containing
+CCZ4 vacuum operator now execute together without stage readback. The
+tracked `8 x 8` frozen-neural campaign matches the independent float64 CCZ4
+FD2 RHS to \(2.33\times10^{-6}\), preserves all projected geometry
+constraints, and keeps every curved recovery valid. See the
+[multidimensional Vulkan evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
+
 ### Retrain the conditioned model
 
 ```powershell
@@ -357,6 +465,18 @@ For the exact environment and validation sequence, see
 | `tesseract_carter_riemann_results.json` | Recorded full-symbol/Riemann evidence |
 | `run_tesseract_neural_phase_riemann.py` | Frozen-neural phase-discontinuity convergence campaign |
 | `tesseract_neural_phase_riemann_results.json` | Recorded learned-phase corridor and ladder evidence |
+| `tesseract_nr_gpu.slang` | Full resident Carter recovery/transport/source and derivative CCZ4 kernels |
+| `tesseract_nr/vulkan_backend.py` | Multidimensional Vulkan state ABI, coupled scheduler, and dispatch control plane |
+| `run_vulkan_frozen_neural.py` | Qualified frozen-neural GPU phase-front campaign |
+| `run_vulkan_weno.py` | GPU WENO5-Z accuracy and positivity qualification |
+| `run_vulkan_carter_eigensystem.py` | Numerical Carter symbol and characteristic-WENO qualification |
+| `run_vulkan_mixed_sources.py` | Full-vector mixed stress and implicit-drag qualification |
+| `run_vulkan_full_carter_ccz4.py` | Curved nine-field Carter and CCZ4 geometry qualification |
+| `vulkan_full_carter_ccz4_results.json` | Recorded full-vector/geometry qualification evidence |
+| `run_vulkan_multidimensional.py` | Resident multidimensional Carter/CCZ4 evolution qualification |
+| `vulkan_multidimensional_results.json` | Recorded coupled GPU evolution evidence |
+| `run_vulkan_theory33.py` | CPU/GPU parity and device-residency campaign |
+| `vulkan_theory33_results.json` | Recorded first GPU PDE-port evidence |
 | `migrate_full_slang.py` | Deterministic GLSL-to-Slang migration and native kernels |
 | `progressive_full_unroll.py` | Piecewise BPTT, continuation, margins, and validation |
 | `train_lyapunov_conditioned.py` | Intrinsic attractor and Lyapunov curriculum |
@@ -386,6 +506,12 @@ artifacts contain everything needed to regenerate the tracked Slang modules.
 - [Neural spacetime frontier report](NEURAL_SPACETIME_FRONTIER_REPORT.md)
 - [Characteristic shock frontier report](CHARACTERISTIC_SHOCK_FRONTIER_REPORT.md)
 - [Full Carter eigensystem and Riemann report](FULL_CARTER_RIEMANN_REPORT.md)
+- [GPU-resident Theory 3.3 report](VULKAN_THEORY33_PORT_REPORT.md)
+- [GPU-resident frozen-neural report](VULKAN_FROZEN_NEURAL_PORT_REPORT.md)
+- [GPU WENO and positivity report](VULKAN_WENO_PORT_REPORT.md)
+- [GPU Carter eigensystem report](VULKAN_CARTER_EIGENSYSTEM_REPORT.md)
+- [GPU full Carter/CCZ4 report](VULKAN_FULL_CARTER_CCZ4_REPORT.md)
+- [GPU multidimensional evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
 - [Lyapunov conditioning](docs/LYAPUNOV_CONDITIONING.md)
 - [Visualization instrument](docs/VISUALIZATION.md)
 - [Reproducibility and validation](docs/REPRODUCIBILITY.md)
@@ -403,6 +529,14 @@ artifacts contain everything needed to regenerate the tracked Slang modules.
 - A Slang SPIR-V reverse-emission issue affects the nested dual-valued
   physical closure. The production diagnostic uses a validated analytical
   neural VJP plus small centered Vulkan Jacobians inside a frozen hard region.
+- The fully curved eleven-component interface currently uses the robust
+  multidirectional Rusanov baseline. The qualified characteristic WENO path
+  has not yet been generalized from the restricted resident block.
+- The coupled Vulkan CCZ4 operator currently uses periodic centered-FD2
+  derivatives. Physical boundaries, high-order geometry derivatives, AMR,
+  domain decomposition, and production strong-field convergence remain open.
+- Device evolution uses float32 and is qualified against the float64 CPU
+  oracle; mixed-precision and long-duration error control remain future work.
 - GPU validation currently requires local Vulkan hardware; hosted CI performs
   source, artifact, and deterministic-generation checks only.
 
@@ -414,12 +548,12 @@ evidence for derivative changes.
 
 ## Citation
 
-If you use Carter/KKT Tesseract in research, please cite the project using the
+If you use Vulkan Tesseract in research, please cite the project using the
 machine-readable metadata in [CITATION.cff](CITATION.cff). GitHub exposes this
 metadata through its **Cite this repository** interface.
 
 ## License
 
-Carter/KKT Tesseract is licensed under the
+Vulkan Tesseract is licensed under the
 [Apache License 2.0](LICENSE). Attribution information is provided in
 [NOTICE](NOTICE).

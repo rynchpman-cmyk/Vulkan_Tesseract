@@ -2,14 +2,18 @@
 
 ## Recommended repository identity
 
-- **Name:** `carter-kkt-tesseract`
-- **Description:** `A hard-constrained differentiable Carter/KKT Vulkan simulator evolved from a parity-gated scalar recurrence.`
+- **Name:** `Vulkan_Tesseract`
+- **Description:** `Turn your gaming PC into a GPU-resident neural Carter/CCZ4 spacetime simulator.`
 - **Topics:**
   - `automatic-differentiation`
   - `differentiable-physics`
   - `dynamical-systems`
   - `kkt`
   - `lyapunov`
+  - `numerical-relativity`
+  - `ccz4`
+  - `gpu-computing`
+  - `neural-pde`
   - `shader`
   - `slang`
   - `vulkan`
@@ -23,18 +27,18 @@ gh auth login
 gh auth status
 ```
 
-Create a private repository:
+Create the public repository:
 
 ```powershell
-gh repo create carter-kkt-tesseract `
-    --private `
+gh repo create Vulkan_Tesseract `
+    --public `
     --source . `
     --remote origin `
     --push
 ```
 
-Or replace `--private` with `--public` after reviewing the repository contents.
-This project is distributed under the Apache License 2.0.
+Use `--private` only for a staging mirror. This project is distributed under
+the Apache License 2.0.
 
 Set topics:
 
@@ -44,6 +48,10 @@ gh repo edit --add-topic automatic-differentiation `
     --add-topic dynamical-systems `
     --add-topic kkt `
     --add-topic lyapunov `
+    --add-topic numerical-relativity `
+    --add-topic ccz4 `
+    --add-topic gpu-computing `
+    --add-topic neural-pde `
     --add-topic shader `
     --add-topic slang `
     --add-topic vulkan
