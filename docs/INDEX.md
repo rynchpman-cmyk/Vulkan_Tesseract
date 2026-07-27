@@ -1,87 +1,35 @@
-# Documentation index
+# Vulkan Tesseract documentation
 
-This documentation follows the project in the order it was created and then
-explains the final system from the inside out.
+## Core guides
 
-1. [Origin story](ORIGIN_STORY.md) — six stages from scaled addition to the
-   Carter/KKT recurrence.
-2. [Mathematical model](MATHEMATICAL_MODEL.md) — the literal map, KKT sector,
-   Carter closure, and boundary certificates.
-3. [Architecture](ARCHITECTURE.md) — source-of-truth files, runtime dataflow,
-   kernels, and artifacts.
-4. [Differentiation](DIFFERENTIATION.md) — selected-system implicit VJP,
-   mixed-direction neural reverse, and piecewise BPTT.
-5. [Lyapunov conditioning](LYAPUNOV_CONDITIONING.md) — why the baseline
-   explodes and how the scale-1 attractor is trained.
-6. [Visualization](VISUALIZATION.md) — the full-stack neural-spacetime
-   observatory, basin atlas, KKT phase map, and 4D Carter projection.
-7. [Reproducibility](REPRODUCIBILITY.md) — environments, commands, generated
-   artifacts, and validation tiers.
-8. [Publishing](PUBLISHING.md) — recommended GitHub metadata and publication
-   commands.
-9. [Theory 3.3 physical hybrid](THEORY33_HYBRID.md) — future-timelike
-   currents, analytic M1 closure, hard physical gates, and characteristic
-   validation.
-10. [Theory 3.3 experiment report](../THEORY33_EXPERIMENT_REPORT.md) —
-    literature-motivated nonsmooth differentiation and neural constitutive
-    experiments.
-11. [Advanced frozen-constitutive report](../THEORY33_ADVANCED_REPORT.md) —
-    independent kinetic data, phase uncertainty, PSD mobility, event-aware
-    BPTT, margin continuation, replay, and Vulkan export.
+1. [Architecture](ARCHITECTURE.md) — resident GPU/CPU-oracle dataflow,
+   constitutive branches, transport, sources, and CCZ4 coupling.
+2. [Reproducibility](REPRODUCIBILITY.md) — environments, campaign commands,
+   tracked evidence, and validation tiers.
+3. [CPU numerical-relativity oracle](NR_PDE_SOLVER.md) — the independent
+   float64 state contract used to qualify Vulkan physics.
+4. [Publishing](PUBLISHING.md) — standalone repository metadata and public
+   release checklist.
 
-12. [Numerical-relativity PDE solver](NR_PDE_SOLVER.md) — the 52-component
-    CCZ4, conservative two-current, and mixed-vector CPU reference backend.
-13. [NR PDE transplant report](../NR_PDE_TRANSPLANT_REPORT.md) — source
-    boundary, state contract, first coupled run, regression evidence, and
-    promotion gates.
-14. [Frozen neural PDE promotion](../NEURAL_PDE_PROMOTION_REPORT.md) —
-    active learned primitive recovery/RHS and the first analytic/frozen
-    continuum ladder.
-15. [Constraint-converged neural spacetime](../CONSTRAINED_NEURAL_SPACETIME_REPORT.md)
-    — compatible CMC data, full evolution, and joint CCZ4 convergence.
-16. [Neural spacetime frontier](../NEURAL_SPACETIME_FRONTIER_REPORT.md) —
-    WENO5-Z fluxes, Strang splitting, a 128-step constrained horizon, 2D
-    continuum convergence, and the complete 3D neural path.
-17. [Full Carter eigensystem and Riemann frontier](../FULL_CARTER_RIEMANN_REPORT.md)
-    — the literal flux/path Jacobian, complete conditioned eigenbasis, and
-    analytic-M1 multifluid shock ladders.
-18. [Frozen-neural phase Riemann frontier](../FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md)
-    — a qualified conserved-state learned-phase corridor and converged
-    16/32/64/128-cell discontinuity with dynamic hard switching.
-19. [GPU-resident Theory 3.3 port](../VULKAN_THEORY33_PORT_REPORT.md)
-    — the first no-readback Vulkan PDE vertical slice with device recovery,
-    Carter flux/path evolution, SSP-RK3, and float64 CPU parity.
-20. [GPU-resident frozen-neural port](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md)
-    — digest-locked neural constitutive recovery and a dynamically moving
-    hard phase tape with cellwise CPU/Vulkan agreement.
-21. [GPU WENO and positivity port](../VULKAN_WENO_PORT_REPORT.md)
-    — fifth-order device interfaces and conservative face-compatible
-    admissibility limiting.
-22. [GPU Carter eigensystem](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md)
-    — numerical flux/path symbols, audited real modes, and branch-aware
-    characteristic WENO on the resident physical block.
-23. [GPU full Carter sources and CCZ4 geometry](../VULKAN_FULL_CARTER_CCZ4_REPORT.md)
-    — mixed-vector stress, implicit drag, curved three-direction nine-field
-    eigensystems, and packed CCZ4 matter coupling.
-24. [GPU multidimensional Carter/CCZ4 evolution](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
-    — curved resident recovery, multidirectional flux/path assembly, nested
-    Strang scheduling, and the derivative-containing CCZ4 vacuum operator.
+## Vulkan progression reports
 
-Measured outputs are preserved separately:
+1. [Resident Theory 3.3 port](../VULKAN_THEORY33_PORT_REPORT.md)
+2. [Frozen-neural constitutive port](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md)
+3. [WENO5-Z and positivity port](../VULKAN_WENO_PORT_REPORT.md)
+4. [Numerical Carter eigensystem](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md)
+5. [Full Carter sources and CCZ4 geometry](../VULKAN_FULL_CARTER_CCZ4_REPORT.md)
+6. [Multidimensional Carter/CCZ4 evolution](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
 
-- [Progressive full-physics report](../FULL_PHYSICS_UNROLL_REPORT.md)
-- [Literal Lyapunov-conditioning report](../LYAPUNOV_CONDITIONING_REPORT.md)
-- [Theory 3.3 experiment report](../THEORY33_EXPERIMENT_REPORT.md)
-- [Advanced frozen-constitutive report](../THEORY33_ADVANCED_REPORT.md)
-- [NR PDE transplant report](../NR_PDE_TRANSPLANT_REPORT.md)
-- [Frozen neural PDE promotion](../NEURAL_PDE_PROMOTION_REPORT.md)
-- [Constraint-converged neural spacetime](../CONSTRAINED_NEURAL_SPACETIME_REPORT.md)
-- [Neural spacetime frontier](../NEURAL_SPACETIME_FRONTIER_REPORT.md)
-- [Full Carter eigensystem and Riemann frontier](../FULL_CARTER_RIEMANN_REPORT.md)
-- [Frozen-neural phase Riemann frontier](../FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md)
-- [GPU-resident Theory 3.3 port](../VULKAN_THEORY33_PORT_REPORT.md)
-- [GPU-resident frozen-neural port](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md)
-- [GPU WENO and positivity port](../VULKAN_WENO_PORT_REPORT.md)
-- [GPU Carter eigensystem](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md)
-- [GPU full Carter sources and CCZ4 geometry](../VULKAN_FULL_CARTER_CCZ4_REPORT.md)
-- [GPU multidimensional Carter/CCZ4 evolution](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
+The reports are ordered by implementation dependency. Earlier reports retain
+their historical qualification boundary and link forward when a later
+milestone crosses it.
+
+## Machine-readable evidence
+
+- `vulkan_theory33_results.json`
+- `vulkan_frozen_neural_results.json`
+- `vulkan_weno_results.json`
+- `vulkan_carter_eigensystem_results.json`
+- `vulkan_mixed_source_results.json`
+- `vulkan_full_carter_ccz4_results.json`
+- `vulkan_multidimensional_results.json`

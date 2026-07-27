@@ -1,34 +1,33 @@
 # Contributing
 
-Contributions are welcome, especially when they improve the mathematical
-auditability, Vulkan implementation, or stability analysis.
+Contributions are welcome when they improve Vulkan execution, physical
+fidelity, numerical stability, performance, or independent validation.
 
 ## Development principles
 
-1. **Keep hard decisions explicit.** Do not silently smooth parity, classifier,
-   branch, or KKT active-set decisions in the production path.
-2. **Differentiate the selected system.** Candidate ranking remains hard;
-   continuous gradients belong to the winning KKT residual.
-3. **Preserve Carter structure.** Learned constitutive behavior should descend
-   from one scalar master function unless an experiment is explicitly labeled
-   as an ablation.
-4. **Validate derivatives externally.** Changes to a backward path need a
-   centered finite-difference or equivalent numerical audit.
-5. **Report margins.** A valid certificate near a switching surface is not the
-   same as a robust certificate.
-6. **Separate diagnostics from claims.** Continuation can demonstrate
-   mechanical unrollability; only literal scale-1 runs support intrinsic
-   conditioning claims.
+1. **Keep hard decisions explicit.** Do not silently smooth constitutive
+   classifiers, active sets, or phase transitions in the production path.
+2. **Preserve Carter structure.** Learned constitutive behavior should descend
+   from one scalar master response unless an experiment is labeled otherwise.
+3. **Keep the CPU oracle independent.** Do not make CPU qualification call the
+   shader implementation it is intended to audit.
+4. **Report physical margins.** Recovery validity alone is insufficient;
+   switching, Legendre, thermodynamic, characteristic, and constraint margins
+   belong in evidence.
+5. **Preserve device residency.** Evolution kernels must not introduce hidden
+   `to_numpy` or host synchronization between explicit snapshots.
+6. **Separate qualification from claims.** Experimental kernels should not be
+   described as production paths until their tracked gates pass.
 
 ## Setup
 
-Reference/training dependencies:
+CPU oracle and repository tests:
 
 ```powershell
-python -m pip install -r requirements-training.txt
+python -m pip install "numpy>=2.3,<3" pytest
 ```
 
-Shader dependencies:
+Shader runtime:
 
 ```powershell
 python -m venv .venv-slang
@@ -37,50 +36,35 @@ python -m venv .venv-slang
 
 ## Before submitting a change
 
-Run the CPU-safe repository checks:
+Run the CPU-safe suite:
 
 ```powershell
-python -m unittest discover -s tests -v
-python -m py_compile *.py
-```
-
-Regenerate both Slang modules:
-
-```powershell
-.\.venv-slang\Scripts\python.exe .\migrate_full_slang.py `
-    --model .\hybrid_model.json `
-    --output .\carter_tesseract_full.slang
-
-.\.venv-slang\Scripts\python.exe .\migrate_full_slang.py `
-    --model .\hybrid_model_conditioned.json `
-    --output .\carter_tesseract_conditioned.slang
-```
-
-For physical or differentiation changes, also run:
-
-```powershell
-python .\test_hybrid.py
-.\run_full_slang.ps1
-.\run_conditioned_literal.ps1 -FiniteDifferenceWeights 4
-```
-
-For resident PDE or CCZ4 shader changes, additionally run:
-
-```powershell
-.\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
+python -m compileall -q .
 python -m pytest tests\nr tests\test_artifacts.py -q
 ```
+
+For resident Carter or CCZ4 changes, run:
+
+```powershell
+.\.venv-slang\Scripts\python.exe .\test_vulkan_full_carter_ccz4.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
+```
+
+Run any earlier live regression whose kernel or ABI was modified. When a
+tracked campaign changes, regenerate its `vulkan_*_results.json` file and
+update the matching `VULKAN_*_REPORT.md`.
 
 ## Pull requests
 
 Describe:
 
 - the mathematical or implementation change;
+- affected resident state fields and kernel entry points;
 - which hard signatures can change;
-- validation commands and measured errors;
-- effect on KKT/classifier/parity margins;
-- effect on literal and continued horizons;
-- whether generated Slang files and model artifacts changed.
+- CPU/GPU error, conservation, recovery, and constraint effects;
+- device-residency impact;
+- validation commands and measured results; and
+- generated Slang, frozen-weight, or evidence changes.
 
-Do not commit virtual environments, downloaded compilers, SPIR-V binaries, or
-binary PyTorch checkpoints.
+Do not commit virtual environments, downloaded compiler tools, SPIR-V
+binaries, binary PyTorch checkpoints, or local campaign logs.

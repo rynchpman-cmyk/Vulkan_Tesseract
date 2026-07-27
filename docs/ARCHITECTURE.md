@@ -1,177 +1,168 @@
-# Architecture
+# Vulkan architecture
 
-## Source-of-truth layers
-
-The project intentionally has four complementary representations:
+## Runtime layers
 
 | Layer | File | Role |
 |---|---|---|
-| GLSL | `carter_tesseract_kkt.comp` | Canonical physical equations and headless compute shader |
-| PyTorch | `hybrid_tesseract.py` | High-precision differentiable reference and training model |
-| Physical PyTorch | `theory33_hybrid.py` | Timelike two-current M1 closure and characteristic audit |
-| Physical Slang | `theory33_hybrid.slang` | Analytic M1 constitutive and native reverse kernel |
-| Slang | `carter_tesseract_*.slang` | Generated native Vulkan forward and reverse kernels |
-| NR CPU | `tesseract_nr/` | Coupled CCZ4, conservative matter, two-current, and mixed-vector PDE oracle |
-| NR Vulkan | `tesseract_nr_gpu.slang` | Resident multidimensional Carter recovery/transport/source and derivative CCZ4 evolution |
+| Device physics | `tesseract_nr_gpu.slang` | Carter recovery, constitutive response, stress, transport, sources, eigensystems, and CCZ4 |
+| Device control | `tesseract_nr/vulkan_backend.py` | Resident buffers, dispatch graph, splitting, initialization, and explicit snapshots |
+| CPU oracle | `tesseract_nr/` | Independent float64 geometry, matter, recovery, transport, and diagnostics |
+| Qualification | `tesseract_nr/vulkan_validation.py` | CPU/GPU comparisons and tracked acceptance gates |
+| Frozen closure | `theory33_qualified_frozen.slang` | Digest-locked learned constitutive inference |
 
-`migrate_full_slang.py` mechanically imports the GLSL body, specializes model
-constants from a portable JSON artifact, and appends the differentiable and
-diagnostic kernels. Generated Slang files are tracked so a reader can inspect
-the exact shader used in reported experiments.
-
-## Runtime dataflow
+## Coupled dataflow
 
 ```mermaid
 flowchart TD
-    M["hybrid_model*.json"] --> G["migrate_full_slang.py"]
-    S["carter_tesseract_kkt.comp"] --> G
-    G --> SL["generated Slang module"]
-    SL --> HF["fullPhysicalStep"]
-    SL --> HT["fullPhysicalTapeKernel"]
-    HF --> R["literal recurrence"]
-    HT --> T["32-float hard tape"]
-    T --> NC["neuralClosureKernel"]
-    NC --> PC["physicalClosureKernel"]
-    PC --> BPTT["progressive reverse sweep"]
-    BPTT --> NB["neuralClosureBackwardKernel"]
-    SL --> V["carterDiagnosticKernel"]
-    V --> UI["interactive tesseract dashboard"]
+    C["packed CCZ4 state"] --> P["algebraic projection"]
+    P --> G["physical h_ij, K_ij, lapse, shift"]
+    G --> R["curved nine-variable Carter recovery"]
+    N["analytic M1 or frozen neural master"] --> R
+    R --> M["material stress and canonical momentum"]
+    X["mixed-vector fields"] --> V["mixed-vector stress"]
+    M --> T["total rho, S_i, S_ij"]
+    V --> T
+    R --> F["directional flux and Carter DLM path"]
+    F --> I["Rusanov interfaces and summed RHS"]
+    I --> RK["resident SSP-RK3"]
+    R --> D["implicit counterflow drag"]
+    D --> RK
+    T --> Z["CCZ4 matter source"]
+    P --> Q["derivative CCZ4 vacuum RHS"]
+    Z --> GRK["projected CCZ4 SSP-RK3"]
+    Q --> GRK
+    GRK --> C
+    RK --> R
 ```
 
-## Main shader kernels
+## Resident state contracts
 
-### `fullPhysicalStep`
+### Carter primitive
 
-Evaluates the complete recurrence:
+```text
+log n, s, q_N_x, q_N_y, q_N_z,
+log d, q_D_x, q_D_y, q_D_z
+```
 
-- primitive Carter fields;
-- invariants;
-- both KKT branches;
-- neural master function;
-- Carter momenta and stress;
-- free energy and branchwise derivative;
-- boundary certificate;
-- literal next state.
+### Carter conserved
 
-### `fullPhysicalTapeKernel`
+```text
+D_N, D_D, S_x, S_y, S_z, E,
+P_D_x, P_D_y, P_D_z, D_N*s, D_N*Y
+```
 
-Records the hard and continuous data needed by a branchwise backward pass.
-The 32 columns contain:
+### CCZ4
 
-| Columns | Meaning |
-|---:|---|
-| `0` | boundary-crossing indicator \(\iota\) |
-| `1` | selected branch \(\sigma\) |
-| `2..9` | active \(q,\theta\) values and \(z\)-tangents |
-| `10..17` | opposite-side values and tangents |
-| `18` | active KKT mask |
-| `19` | active classifier mask |
-| `20` | active KKT validity |
-| `21` | opposite KKT mask |
-| `22` | opposite KKT validity |
-| `23..24` | active/opposite KKT feasibility margins |
-| `25..26` | active/opposite classifier margins |
-| `27..28` | active/opposite condition estimates |
-| `29` | opposite classifier mask |
-| `30` | parity cell |
-| `31` | distance to the nearest parity boundary |
+```text
+gt_ij, At_ij, phi, K, theta, GammaHat_i,
+alpha, beta_i, B_i
+```
 
-### `neuralClosureKernel`
+Both tensor blocks are row-major. Flattened spatial grids are x-fastest:
 
-Evaluates both branch copies of the learned master response and writes eight
-dual-valued closure components per branch.
+```text
+point = x + nx * (y + ny * z)
+```
 
-### `physicalClosureKernel`
+Inactive dimensions have extent one and contribute zero spatial derivatives.
 
-Consumes a frozen hard tape and continuous learned closure, then evaluates the
-compact Carter recurrence.
+## Curved recovery
 
-### `neuralClosureBackwardKernel`
+The recovery kernel subtracts the geometry-dependent vector energy and
+momentum from the total conserved state, then solves the nine material
+unknowns with:
 
-Implements a manually lowered mixed-direction jet VJP for all 1,287 shared
-weights. It avoids a prohibitively slow higher-order reverse generated by the
-current Slang SPIR-V backend.
+- scaled centered finite-difference Jacobians;
+- a pivoted `9 x 9` linear solve;
+- backtracking line search;
+- density and entropy guards; and
+- branch-frozen neural constitutive evaluation.
 
-### `carterDiagnosticKernel`
+Hard phase decisions are constant inside a Newton solve. The classifier is
+re-evaluated only between transition solves. Recovery diagnostics include
+the scaled residual, validity, phase crossings, active phase, switching
+margin, recovered entropy/tracer, and geometry validity.
 
-Exposes all 16 tesseract vertices for visualization. Each vertex reports:
+## Transport
 
-1. scalar value;
-2. scalar \(z\)-tangent;
-3. vector norm;
-4. matrix norm.
+For every active direction, the device evaluates:
 
-## Python components
+1. curved Carter material flux;
+2. mixed-vector energy, momentum, and stress contributions;
+3. entropy and tracer transport;
+4. canonical-momentum DLM path data;
+5. a coordinate characteristic-speed bound;
+6. periodic Rusanov face fluxes; and
+7. directional flux divergence plus midpoint path source.
 
-- `run_tesseract.py` compiles and dispatches the canonical GLSL shader.
-- `hybrid_tesseract.py` defines the neural master, exact candidate search,
-  custom KKT VJP, Carter closure, recurrence, and rollout.
-- `theory33_hybrid.py` reuses the hard recurrence around a self-contained
-  physical current map, analytic M1 master, Hilbert stress, convexity gates,
-  differentiated principal-symbol audit, and a fitted state-dependent
-  odd-cell capture gain for the qualified compact initialization basin. A
-  separate hard outer projection maps every finite scalar input into that
-  basin before physical evaluation.
-- `theory33_hybrid.slang` independently evaluates the analytic M1
-  constitutive coefficients and exposes native reverse mode with respect to
-  the four physical master features.
-- `train_hybrid.py` is the initial short-horizon BPTT experiment.
-- `train_lyapunov_conditioned.py` is the scale-1 conditioning curriculum.
-- `progressive_full_unroll.py` runs hard-tape BPTT and finite-difference
-  validation on Vulkan.
-- `visualize_tesseract.py` performs batched Vulkan atlas capture and renders
-  the interactive instrument.
-- `tesseract_nr/vulkan_backend.py` owns resident device buffers and submits
-  the Theory 3.3 recovery, flux/path, and SSP-RK3 dispatch graph without
-  per-stage readback. Its constitutive mode selects either analytic M1 or the
-  digest-locked qualified frozen closure.
-- `tesseract_nr_gpu.slang` imports the generated qualified model and carries
-  a hard phase tape through primitive recovery: each Newton/Jacobian solve
-  uses one fixed branch, with explicit transition iterations at recovered
-  classifier crossings.
-- The resident interface graph constructs both componentwise WENO5-Z and
-  piecewise-constant Rusanov fluxes. A cellwise forward-Euler admissibility
-  audit produces \(\theta\); taking the minimum \(\theta\) on both sides of
-  each face conservatively blends the high-order flux back to the monotone
-  control flux.
-- The 1D Carter characteristic path numerically forms
-  \((F_{,p}-B_{,p})U_{,p}^{-1}\) for the five independent material fields.
-  Shifted QR supplies real speeds, inverse iteration supplies right modes,
-  and a pivoted inverse supplies the left basis. Learned phase faces select
-  one qualified physical-side basis rather than averaging across the hard
-  constitutive discontinuity.
-- The widened local Vulkan ABI carries the full physical nine-field block
-  \((D_N,D_D,S_i,E,P_i^D)\). It evaluates curved fluxes and the literal path
-  symbol in all three directions, using active-block QR deflation and inverse
-  iteration for complete `9 x 9` left/right bases.
-- Mixed-vector stress is evaluated in separate A/B device passes and combined
-  on-device. The implicit nine-variable drag solve conserves material
-  density/energy-momentum while converting counterflow into entropy.
-- The packed 31-component CCZ4 geometry ABI projects `det(gt)=1` and
-  `tr(At)=0`, reconstructs physical `h_ij` and `K_ij`, and injects the full
-  Eulerian Carter stress into the algebraic matter-source terms.
-- `VulkanTesseractCoupledBackend` owns the curved multidimensional Carter
-  and CCZ4 state together. It performs geometry half-steps around the full
-  Carter SSP-RK3/implicit-drag step, refreshes curved primitive recovery and
-  total Eulerian stress at every geometry stage, and keeps all active grids
-  x-fastest and resident.
-- The CCZ4 device operator contains periodic centered-FD2 Christoffels,
-  physical Ricci curvature, lapse Hessians, covariant Z derivatives,
-  advection, gauge drivers, and constraint damping. Algebraic projection is
-  applied between its SSP-RK3 stages.
-- `tesseract_nr/vulkan_validation.py` supplies an independent float64
-  material oracle for both constitutive modes and enforces CPU/GPU parity,
-  branch agreement away from the nonsmooth surface, dynamic switching, and
-  zero host reads during evolution.
+Directional RHS buffers are summed after all face passes. The current full
+curved interface uses the robust Rusanov baseline. Component and restricted
+characteristic WENO kernels remain available as qualified earlier layers.
 
-## Model artifacts
+## Local sources
 
-`hybrid_model.json` is the original learned model. It reproduces the
-three-step explosive trajectory and step-four KKT failure at literal scale.
+Mixed-vector stress is evaluated in independent A/B passes before the device
+combine pass, avoiding temporary-array aliasing on Vulkan drivers.
 
-`hybrid_model_conditioned.json` is the separately trained scale-1 model. It
-also contains the final 128-step audit metrics.
+The implicit drag kernel holds material number densities and energy-momentum
+fixed while exponentially relaxing `q_D^i - q_N^i`. Dissipated counterflow is
+converted into entropy. The evolved specific tracer is extracted from the
+resident conserved state before recomposition.
 
-Binary PyTorch checkpoints are local build artifacts. They are excluded from
-Git because the portable JSON contains the inference parameters required by
-the shaders.
+## CCZ4 operator
+
+The packed geometry kernel supplies:
+
+- conformal determinant and tracefree projection;
+- physical metric and extrinsic-curvature reconstruction;
+- physical and conformal Christoffel symbols;
+- physical Ricci tensor and scalar;
+- lapse Hessian and covariant Laplacian;
+- `Z_i`, `D_i Z_j`, and `div Z`;
+- Lie/advection terms;
+- 1+log or harmonic slicing;
+- Gamma-driver shift evolution;
+- `kappa1`, `kappa2`, and `kappa3` damping; and
+- full Eulerian Carter matter sources.
+
+Spatial derivatives are periodic centered FD2 in the current coupled
+qualification.
+
+## Time scheduling
+
+`VulkanTesseractCoupledBackend.step` applies a symmetric outer split:
+
+```text
+CCZ4(dt/2) -> Carter(dt) -> CCZ4(dt/2)
+```
+
+The Carter step contains its own symmetric stiff-source split:
+
+```text
+drag(dt/2) -> SSP-RK3 transport(dt) -> drag(dt/2)
+```
+
+CCZ4 SSP-RK3 stages are algebraically projected before the following RHS
+evaluation. Curved matter recovery and total stress are refreshed at every
+geometry stage.
+
+## Readback boundary
+
+Evolution methods retain device tensors and do not call `to_numpy`.
+Readbacks occur only through explicit snapshot or qualification methods. The
+tracked multidimensional campaign asserts zero host reads during evolution.
+
+## Independent oracle
+
+The CPU backend does not emulate shader implementation details. It evaluates
+the physical equations in float64 and supplies:
+
+- primitive and drag references;
+- full Carter principal symbols and eigensystems;
+- mixed-vector stress;
+- CCZ4 geometry, derivatives, and matter sources;
+- conservation and continuum diagnostics; and
+- cellwise hard-phase comparisons.
+
+This separation makes CPU/GPU agreement evidence rather than shared-code
+self-consistency.

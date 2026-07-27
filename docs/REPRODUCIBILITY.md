@@ -1,351 +1,140 @@
-# Reproducibility
+# Reproducibility and validation
 
-## Supported environment
+## Environments
 
-The validated environment is:
+Vulkan Tesseract uses two Python environments.
 
-- Windows 10/11 PowerShell;
-- Python 3.11+;
-- Vulkan-capable GPU and current driver;
-- PyTorch `2.11.0+cpu` for reference training;
-- SlangPy `0.43.1`;
-- NumPy `2.5.1` in the Slang environment;
-- Matplotlib `3.10.0`.
-
-The PowerShell runners create or reuse local virtual environments and install
-pinned shader-side dependencies.
-
-## Environment setup
-
-Training/reference environment:
+CPU oracle and repository checks:
 
 ```powershell
-python -m pip install -r requirements-training.txt
+python -m pip install "numpy>=2.3,<3" pytest
 ```
 
-Slang/Vulkan environment:
+Slang/Vulkan runtime:
 
 ```powershell
 python -m venv .venv-slang
 .\.venv-slang\Scripts\python.exe -m pip install -r requirements-slang.txt
 ```
 
-The original GLSL runner creates `.venv` and downloads
-`glslangValidator` into `.tools` on first use.
+The GPU campaigns require Windows, a current Vulkan driver, and a
+Vulkan-capable device. The CPU tests are platform-independent.
 
-## Deterministic shader generation
+## CPU-safe checks
 
-Generate the baseline:
-
-```powershell
-.\.venv-slang\Scripts\python.exe .\migrate_full_slang.py `
-    --model .\hybrid_model.json `
-    --output .\carter_tesseract_full.slang
-```
-
-Generate the conditioned module:
+Compile source and validate documentation/artifacts:
 
 ```powershell
-.\.venv-slang\Scripts\python.exe .\migrate_full_slang.py `
-    --model .\hybrid_model_conditioned.json `
-    --output .\carter_tesseract_conditioned.slang
+python -m compileall -q .
+python -m unittest tests.test_artifacts -v
 ```
 
-The generated files are tracked. CI regenerates both and fails if the source
-tree changes.
-
-## Validation tiers
-
-### 1. Artifact/source checks
+Run the numerical-relativity oracle and tracked Vulkan evidence contracts:
 
 ```powershell
-python -m unittest discover -s tests/nr -v
-python -m unittest `
-    tests.test_artifacts `
-    tests.test_theory33_advanced `
-    tests.test_theory33_experiments `
-    tests.test_theory33_hybrid `
-    -v
-python -m py_compile *.py
+python -m pytest tests\nr tests\test_artifacts.py -q
 ```
 
-These checks do not require a GPU. The NumPy NR suite and the PyTorch
-constitutive suite intentionally run in separate processes on Windows to
-avoid loading incompatible OpenMP runtimes into one interpreter.
+These checks do not compile or execute Vulkan shaders. They validate portable
+models, generated-source contracts, machine-readable evidence, markdown
+links, CPU physics, and the recorded CPU/GPU qualification thresholds.
 
-### 2. PyTorch differentiability
+## Live Vulkan campaigns
 
-```powershell
-python .\test_hybrid.py
-```
-
-Checks finite recurrence loss, exact KKT feasibility, and a local derivative
-against centered finite differences.
-
-### 3. Theory 3.3 physical hybrid
-
-```powershell
-.\run_theory33_hybrid.ps1
-```
-
-Runs 128 literal steps with KKT, timelike-current, convexity, causal-cone,
-principal-symbol, and Lyapunov checks. It additionally evolves a 1,025-point
-initialization grid over `[-1, 1]` and samples both characteristic branches
-over the resulting enclosure. Finally, it sends signed log-spaced inputs
-through magnitude `1e300` through the global absorbing gate and verifies
-finite evolution, zero outer sensitivity, and physical validity. This tier is
-CPU-only.
-
-Regenerate and verify the compact controller coefficients with:
-
-```powershell
-python .\fit_theory33_basin.py
-```
-
-Run the isolated nonsmooth and neural-constitutive experiment ladder with:
-
-```powershell
-.\run_theory33_experiments.ps1 `
-    -Output .\theory33_experiment_results.json
-```
-
-The full run trains all experimental modules and then applies the same
-128-step basin, physical, characteristic, and global-safety gates. Use
-`-Quick` for a shorter development fit with unchanged acceptance audits.
-Measurements and limitations are documented in
-[the experiment report](../THEORY33_EXPERIMENT_REPORT.md).
-
-Generate the independent kinetic EOS, transport, and noisy phase tables:
-
-```powershell
-python .\generate_theory33_kinetic_data.py `
-    --output-directory .\data
-```
-
-Run the full frozen-constitutive qualification:
-
-```powershell
-.\run_theory33_advanced.ps1
-```
-
-This trains from the frozen tables, uses held-out trajectories, bootstraps
-phase uncertainty, compares multi-step event-gradient estimators, continues
-the Carter scale against explicit margins, writes
-`theory33_frozen_variants.json`, and then replays the artifact without
-fitting. Use `-Quick` for development resolution.
-
-Export only the qualified artifact and validate it on Vulkan:
-
-```powershell
-.\run_theory33_frozen_slang.ps1
-```
-
-See the
-[advanced qualification report](../THEORY33_ADVANCED_REPORT.md) for hashes,
-acceptance thresholds, results, and limitations.
-
-### 4. Theory 3.3 native Slang closure
-
-```powershell
-.\run_theory33_slang.ps1
-```
-
-Checks the analytic M1 constitutive values and native reverse gradient against
-an independent float32 implementation on Vulkan.
-
-### 5. GLSL/PyTorch parity
-
-```powershell
-python .\compare_backends.py --steps 2
-```
-
-Checks recurrence values, active sets, and classifier masks.
-
-### 6. Native Slang reverse
-
-```powershell
-.\run_full_slang.ps1
-```
-
-Checks compact/full primal equality, nonzero adjoints, all 1,287 weights, and
-finite-difference agreement.
-
-### 7. Progressive full physics
-
-```powershell
-.\run_progressive_full.ps1
-```
-
-Runs continuation horizons and whole-trajectory BPTT audits.
-
-### 8. Conditioned literal milestone
-
-```powershell
-.\run_conditioned_literal.ps1
-```
-
-Requires:
-
-- scale `1.0`;
-- no gain control;
-- valid KKT certificates;
-- healthy margins;
-- non-increasing Lyapunov value;
-- convergence at horizons 64 and 128.
-
-### 9. Neural numerical-relativity frontier
-
-```powershell
-.\run_tesseract_nr_frontier.ps1 `
-    -HorizonSteps 128 `
-    -Output tesseract_nr_frontier_results.json
-```
-
-This CPU campaign verifies the coupled WENO5-Z order, runs constrained
-analytic and frozen models for 128 steps, measures the 2D
-6x6/12x12/24x24 continuum ladder, and completes a 6x6x6 frozen-neural
-constraint/evolution smoke. The tracked JSON is the machine-readable
-qualification record.
-
-### 10. Characteristic shocks and hard phase crossings
-
-```powershell
-.\run_tesseract_nr_shocks.ps1
-```
-
-This CPU campaign runs a 2D characteristic-WENO rarefaction-corner
-falsification control, qualifies conservative material/carrier positivity
-limiting, forces outer hard-branch recovery updates, and evolves a
-checkerboard Carter interface through the learned phase threshold. The
-tracked record is `tesseract_nr_shock_results.json`; numerical scope and
-limitations are in
-[the characteristic shock frontier report](../CHARACTERISTIC_SHOCK_FRONTIER_REPORT.md).
-
-### 11. Full Carter eigensystem and Riemann convergence
-
-```powershell
-.\run_tesseract_carter_riemann.ps1
-```
-
-This CPU campaign numerically differentiates the literal nine-field
-flux/path principal system, audits the complete degenerate eigenspaces,
-checks oblique rotational consistency, and evolves two analytic-M1
-relativistic multifluid Riemann ladders through 128 cells. The tracked record
-is `tesseract_carter_riemann_results.json`; derivation, measurements, and
-scope are in
-[the full Carter Riemann report](../FULL_CARTER_RIEMANN_REPORT.md).
-
-### 12. Frozen-neural phase Riemann convergence
-
-```powershell
-.\run_tesseract_neural_phase_riemann.ps1
-```
-
-This CPU campaign audits the exact straight conserved-state path between
-opposite branches of the digest-locked frozen neural closure and evolves the
-resulting discontinuity on a 16/32/64/128-cell ladder. It requires real and
-causal full Carter symbols, valid recovery, positive convexity margins,
-resolved phase interfaces, periodic baryon/carrier balance, decreasing
-self-error, and a cellwise hard-classifier crossing. The tracked record is
-`tesseract_neural_phase_riemann_results.json`; measurements and scope are in
-[the frozen-neural phase Riemann report](../FROZEN_NEURAL_PHASE_RIEMANN_REPORT.md).
-
-### 13. GPU-resident Theory 3.3 vertical slice
+### Resident analytic-M1 vertical slice
 
 ```powershell
 .\run_vulkan_theory33.ps1
 ```
 
-This campaign keeps the seven-field flat 1D Carter material state on Vulkan
-through primitive recovery, analytic-M1 evaluation, Rusanov fluxes, the DLM
-canonical-momentum path product, entropy projection, and SSP-RK3. It compares
-16/32/64-cell device results with an independent float64 production oracle
-and requires zero host tensor reads during evolution. The tracked record is
-`vulkan_theory33_results.json`; implementation boundaries and measurements
-are in
-[the GPU-resident Theory 3.3 report](../VULKAN_THEORY33_PORT_REPORT.md).
+Writes `vulkan_theory33_results.json` and qualifies resident recovery,
+Carter flux/path evolution, entropy projection, SSP-RK3, and zero readbacks.
 
-### 14. GPU-resident frozen-neural phase front
+### Frozen-neural phase tape
 
 ```powershell
 .\run_vulkan_frozen_neural.ps1
 ```
 
-This promotes the generated, digest-locked two-phase master into device
-primitive recovery, Carter stress/flux construction, canonical momentum, and
-all SSP-RK3 stages. The 16/32/64-cell boosted phase contact is evolved long
-enough to move the hard front through grid cells. Qualification requires
-float32/float64 physical parity, cellwise phase agreement away from the
-nonsmooth boundary, dynamic branch changes, positive physical margins,
-periodic number balance, and no host reads between snapshots. The tracked
-record is `vulkan_frozen_neural_results.json`; see
-[the GPU frozen-neural report](../VULKAN_FROZEN_NEURAL_PORT_REPORT.md).
+Writes `vulkan_frozen_neural_results.json` and checks digest-locked
+constitutive replay, cellwise hard-phase agreement, dynamic branch movement,
+physical margins, and conservation.
 
-### 15. GPU WENO5-Z and positivity preservation
+### WENO5-Z and positivity
 
 ```powershell
 .\run_vulkan_weno.ps1
 ```
 
-The campaign measures the Vulkan WENO interface order, compares smooth
-analytic-M1 evolution against an independent float64 implementation, forces
-the conservative face limiter active in a discontinuous torture state, and
-evolves a moving frozen-neural phase front. The tracked record is
-`vulkan_weno_results.json`; see
-[the GPU WENO report](../VULKAN_WENO_PORT_REPORT.md).
+Writes `vulkan_weno_results.json` and measures fifth-order interfaces,
+low/high conservative flux blending, limiter activation, smooth parity, and
+learned-phase evolution.
 
-### 16. GPU numerical Carter eigensystem
+### Numerical Carter eigensystem
 
 ```powershell
 .\run_vulkan_carter_eigensystem.ps1
 ```
 
-This compares device eigenvalues with an independent float64 restricted
-flux/path symbol, audits causal speeds, eigenpair and inverse-basis residuals,
-then evolves smooth, discontinuous, and learned-phase states with
-branch-aware characteristic WENO. The tracked record is
-`vulkan_carter_eigensystem_results.json`; see
-[the GPU Carter eigensystem report](../VULKAN_CARTER_EIGENSYSTEM_REPORT.md).
+Writes `vulkan_carter_eigensystem_results.json` and audits numerical
+flux/path symbols, real characteristic speeds, left/right basis inversion,
+branch-aware face selection, and characteristic reconstruction.
 
-### 17. GPU full Carter sources and CCZ4 geometry
+### Mixed sources and full curved Carter/CCZ4 contracts
 
 ```powershell
+.\run_vulkan_mixed_sources.ps1
 .\run_vulkan_full_carter_ccz4.ps1
 ```
 
-This runs independent float64 parity checks for the mixed-vector
-stress/implicit-drag layer, the curved physical nine-field Carter principal
-map and complete `9 x 9` eigensystem in every spatial direction, and packed
-CCZ4 algebraic projection, physical geometry, and matter-source injection.
-The tracked record is `vulkan_full_carter_ccz4_results.json`; see
-[the full Carter/CCZ4 Vulkan report](../VULKAN_FULL_CARTER_CCZ4_REPORT.md).
+These write `vulkan_mixed_source_results.json` and
+`vulkan_full_carter_ccz4_results.json`. They qualify mixed-vector stress,
+implicit entropy-producing drag, the complete curved `9 x 9` Carter
+eigensystem in every direction, CCZ4 algebraic projection, physical geometry,
+and matter-source injection.
 
-### 18. Resident multidimensional Carter/CCZ4 evolution
+### Coupled multidimensional evolution
 
 ```powershell
 .\run_vulkan_multidimensional.ps1
 ```
 
-This runs the curved nine-variable recovery, multidirectional interface/path
-assembly, implicit Strang drag, recovered total matter coupling, and complete
-periodic derivative CCZ4 operator on one resident Vulkan grid. The tracked
-record is `vulkan_multidimensional_results.json`; see
-[the multidimensional Vulkan evolution report](../VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
+Writes `vulkan_multidimensional_results.json`. The tracked `8 x 8` campaign
+requires:
 
-## Retraining
+- agreement of the derivative CCZ4 vacuum RHS with the float64 FD2 oracle;
+- valid curved nine-variable recovery at every point;
+- periodic baryon, carrier, and tracer balance;
+- nonnegative entropy production from the implicit source schedule;
+- determinant and tracefree CCZ4 projection;
+- a resolved frozen-neural switching margin;
+- finite matter, stress, and geometry outputs; and
+- zero host readbacks during evolution.
+
+## Short live regressions
 
 ```powershell
-.\run_train_conditioned.ps1
+.\.venv-slang\Scripts\python.exe .\test_vulkan_theory33_solver.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_frozen_neural.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_weno.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_carter_eigensystem.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_mixed_sources.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_full_carter_ccz4.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
 ```
 
-The checkpoint is written locally as `hybrid_tesseract_conditioned.pt` and is
-ignored by Git. The portable `hybrid_model_conditioned.json` is tracked.
+## Tracked evidence policy
 
-Because GPU kernels use float32 and training uses float64 PyTorch, final digits
-can differ while remaining inside the reported error bounds.
+Each `vulkan_*_results.json` file is generated by its matching campaign and is
+checked into the repository. A result is qualified only when every named
+gate is true. Reports document the equations, thresholds, measured values,
+and honest boundary of the corresponding experiment.
 
-## Known platform warning
+Device kernels use float32 while the independent oracle uses float64. Final
+digits may differ within the reported bounds.
 
-SlangPy can print a D3D12 Agility SDK warning when the Python executable and
-SDK live on different drives. The project explicitly creates a Vulkan device;
-the warning does not affect the validated Vulkan path.
+## Platform warning
+
+SlangPy can print a D3D12 Agility SDK warning when Python and the SDK are on
+different drives. Vulkan Tesseract explicitly creates a Vulkan device; this
+warning does not change the validated execution path.
