@@ -19,17 +19,6 @@ restart. The exact execution boundary and evidence are in the
 
 ![Vulkan Tesseract neural spacetime dashboard](tesseract_full_stack_dashboard.png)
 
-The underlying construction began with
-
-\[
-a\oplus b=\frac32(a+b),
-\]
-
-then grew through a parity-gated recurrence, exact bounded KKT solves, Carter
-master-function structure, differentiable hard decisions, learned
-constitutive response, and finally a coupled numerical-relativity PDE solver.
-This repository focuses on the Vulkan execution of that full stack.
-
 ## Current GPU milestone
 
 The resident multidimensional engine advances:
