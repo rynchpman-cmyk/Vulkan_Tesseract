@@ -258,6 +258,20 @@ every declared resident artifact to pass, every retained host workflow to
 exist, all original computational sources to match their local counterparts,
 and a complete SHA-256 manifest of the production Vulkan implementation.
 
+### Puncture/MOTS production replay
+
+```powershell
+.\run_vulkan_puncture_mots.ps1 -PlanOnly
+.\run_vulkan_puncture_mots.ps1 -SaveSnapshots
+```
+
+The first command validates the `120^3`, length-3, FD4 numerical contract and
+its 16-cell reference-radius gate without allocating a device. The second
+launches the restartable resident vacuum CCZ4 evolution and requests host
+snapshots only for KKT/MOTS observations, oracle constraints, saved
+snapshots, and checkpoints. See
+[the campaign contract](VULKAN_PUNCTURE_MOTS.md).
+
 ## Short live regressions
 
 ```powershell
@@ -268,6 +282,7 @@ and a complete SHA-256 manifest of the production Vulkan implementation.
 .\.venv-slang\Scripts\python.exe .\test_vulkan_mixed_sources.py
 .\.venv-slang\Scripts\python.exe .\test_vulkan_full_carter_ccz4.py
 .\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_mots.py
 ```
 
 ## Tracked evidence policy

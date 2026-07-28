@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IMPLEMENTATION_PATHS = (
     "run_vulkan_original_workflows.py",
     "run_vulkan_parity.py",
+    "run_vulkan_puncture_mots.py",
     "tesseract_nr_gpu.slang",
     "tesseract_cmc_fp64.slang",
     "tesseract_ctt_fp64.slang",
@@ -19,6 +20,8 @@ IMPLEMENTATION_PATHS = (
     "theory33_qualified_frozen.slang",
     "theory33_frozen_variants.json",
     "tesseract_nr/vulkan_backend.py",
+    "tesseract_nr/vulkan_ccz4_vacuum.py",
+    "tesseract_nr/vulkan_mots.py",
     "tesseract_nr/vulkan_boundary.py",
     "tesseract_nr/vulkan_amr.py",
     "tesseract_nr/vulkan_ctt.py",

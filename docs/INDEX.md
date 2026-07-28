@@ -10,6 +10,8 @@
    float64 state contract used to qualify Vulkan physics.
 4. [Publishing](PUBLISHING.md) — standalone repository metadata and public
    release checklist.
+5. [Vulkan puncture/MOTS campaign](VULKAN_PUNCTURE_MOTS.md) — resident vacuum
+   CCZ4 evolution and restartable constrained horizon observations.
 
 ## Vulkan progression reports
 

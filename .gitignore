@@ -10,6 +10,7 @@ __pycache__/
 *.pyo
 *.log
 /tesseract_nr_smoke.npz
+/runs/
 *.egg-info/
 build/
 dist/

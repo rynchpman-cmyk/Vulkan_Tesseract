@@ -41,7 +41,9 @@ The resident multidimensional engine advances:
   physical boundaries;
 - one- through three-dimensional AMR transfer, reflux, and Gauss projection;
 - fp64 periodic CMC, isolated CTT, and TOV construction; and
-- complete Carter–Proca–CCZ4 checkpoint/restart.
+- complete Carter–Proca–CCZ4 checkpoint/restart; and
+- vacuum-only resident puncture CCZ4 evolution with explicit, restartable
+  KKT/MOTS branch observations.
 
 One coupled step uses:
 
@@ -118,6 +120,18 @@ Run the visualization dashboard:
 .\run_visualization.ps1
 ```
 
+Validate the `N=120`, length-3 puncture/MOTS production contract:
+
+```powershell
+.\run_vulkan_puncture_mots.ps1 -PlanOnly
+```
+
+Run it with restartable observation snapshots:
+
+```powershell
+.\run_vulkan_puncture_mots.ps1 -SaveSnapshots
+```
+
 ## Vulkan qualification ladder
 
 Each stage has a runnable campaign, tracked JSON evidence, and a focused
@@ -143,6 +157,7 @@ report.
 | Physical Carter/CCZ4/Proca boundaries | `.\run_vulkan_boundaries.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
 | fp64 TOV and strong-field resident evolution | `.\run_vulkan_tov.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
 | fp64 isolated CTT constraint solve | `.\run_vulkan_isolated_ctt.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| Resident puncture CCZ4 with KKT/MOTS tracking | `.\run_vulkan_puncture_mots.ps1` | [Puncture/MOTS campaign](docs/VULKAN_PUNCTURE_MOTS.md) |
 | Exhaustive original-to-Vulkan audit | `.\run_vulkan_parity.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
 
 The progression reports retain the boundary of each experiment and point to
@@ -191,6 +206,8 @@ See [architecture](docs/ARCHITECTURE.md) and
 | `tesseract_nr/vulkan_tov.py` | fp64 TOV construction and Cartesian sampling |
 | `tesseract_nr/vulkan_ctt.py` | fp64 isolated CTT constraint solve |
 | `tesseract_nr/vulkan_frontier.py` | Long-horizon and multidimensional frontier campaigns |
+| `tesseract_nr/vulkan_ccz4_vacuum.py` | Vacuum-only resident projected CCZ4 evolution |
+| `tesseract_nr/vulkan_mots.py` | Packed Vulkan snapshot bridge and restartable puncture/MOTS observer |
 | `tesseract_nr/vulkan_parity.py` | Exhaustive capability and source-identity audit |
 | `tesseract_nr/vulkan_validation.py` | Independent CPU/Vulkan qualification campaigns |
 | `tesseract_cmc_fp64.slang` | fp64 periodic constrained-data kernels |
@@ -225,6 +242,7 @@ All live Vulkan regressions:
 .\.venv-slang\Scripts\python.exe .\test_vulkan_mixed_sources.py
 .\.venv-slang\Scripts\python.exe .\test_vulkan_full_carter_ccz4.py
 .\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
+.\.venv-slang\Scripts\python.exe .\test_vulkan_mots.py
 .\run_vulkan_frontier.ps1
 .\run_vulkan_ccz4_fd4.ps1
 .\run_vulkan_amr.ps1
@@ -266,6 +284,7 @@ Exact environments, generated artifacts, and campaign commands are listed in
 - [Architecture](docs/ARCHITECTURE.md)
 - [Reproducibility](docs/REPRODUCIBILITY.md)
 - [CPU numerical-relativity oracle](docs/NR_PDE_SOLVER.md)
+- [Vulkan puncture/MOTS campaign](docs/VULKAN_PUNCTURE_MOTS.md)
 - [Publishing](docs/PUBLISHING.md)
 - [Multidimensional evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
 - [Original-to-Vulkan capability parity](VULKAN_CAPABILITY_PARITY.md)
