@@ -15,16 +15,16 @@
         "carrier_density_conserved": 2.764136520366778e-09,
         "energy": 2.0897591490598444e-08,
         "entropy": 2.6184213949842494e-07,
-        "momentum_x": 2.9788265300603745e-10,
+        "momentum_x": 3.316324914334756e-10,
         "tracer": 4.041533083892768e-09
       },
       "maximum_recovery_residual": 6.29042972377647e-07,
       "maximum_relative_lorentz_factor": 1.000241756439209,
       "minimum_carrier_density": 0.004804099909961224,
       "minimum_density": 0.09510587155818939,
-      "minimum_legendre_eigenvalue": 0.9845963716506958,
+      "minimum_legendre_eigenvalue": 0.9845962524414062,
       "minimum_thermodynamic_eigenvalue": 0.8965042233467102,
-      "physical_state_relative_error": 9.89851913442453e-08,
+      "physical_state_relative_error": 9.898438256654544e-08,
       "points": 16,
       "qualification": {
         "counterflow_domain_valid": true,
@@ -42,8 +42,8 @@
         "carrier_canonical_momentum_x": 8.908816571354257e-07,
         "carrier_density_conserved": 3.5011761449910187e-07,
         "energy": 8.610541927897906e-08,
-        "entropy": 8.457013319153604e-07,
-        "momentum_x": 2.1361707414195346e-07,
+        "entropy": 7.945624638747045e-07,
+        "momentum_x": 2.015244348861421e-07,
         "tracer": 1.0923988938166394e-07
       },
       "steps": 1
@@ -59,7 +59,7 @@
         "carrier_canonical_momentum_x": 9.665767891602237e-13,
         "carrier_density_conserved": 2.8616642241616197e-09,
         "energy": 5.8624798071615913e-08,
-        "entropy": 3.503226931322878e-07,
+        "entropy": 3.524873703197873e-07,
         "momentum_x": 7.863051316829572e-10,
         "tracer": 5.2033368828918736e-09
       },
@@ -69,7 +69,7 @@
       "minimum_density": 0.09502909332513809,
       "minimum_legendre_eigenvalue": 0.9846124649047852,
       "minimum_thermodynamic_eigenvalue": 0.8964177966117859,
-      "physical_state_relative_error": 1.743161598147103e-07,
+      "physical_state_relative_error": 1.7545432638110145e-07,
       "points": 32,
       "qualification": {
         "counterflow_domain_valid": true,
@@ -86,9 +86,9 @@
         "baryon_density_conserved": 1.5999051846270172e-07,
         "carrier_canonical_momentum_x": 9.32539712459764e-07,
         "carrier_density_conserved": 2.6518378250098966e-07,
-        "energy": 1.8470635679150275e-07,
-        "entropy": 1.0827633655979555e-06,
-        "momentum_x": 3.8695143204220195e-07,
+        "energy": 1.8663925715909268e-07,
+        "entropy": 1.1134102455721155e-06,
+        "momentum_x": 3.49230527392655e-07,
         "tracer": 1.4716079158275466e-07
       },
       "steps": 1
@@ -105,16 +105,16 @@
         "carrier_density_conserved": 7.09376262592043e-09,
         "energy": 4.550123583468846e-08,
         "entropy": 9.197853527431743e-07,
-        "momentum_x": 5.907872015003483e-09,
+        "momentum_x": 5.849664354090015e-09,
         "tracer": 9.091716497711122e-09
       },
       "maximum_recovery_residual": 2.9974620701977983e-05,
       "maximum_relative_lorentz_factor": 1.0002479553222656,
       "minimum_carrier_density": 0.004800315946340561,
       "minimum_density": 0.09500855207443237,
-      "minimum_legendre_eigenvalue": 0.9845901727676392,
-      "minimum_thermodynamic_eigenvalue": 0.8963955640792847,
-      "physical_state_relative_error": 2.003748509897487e-07,
+      "minimum_legendre_eigenvalue": 0.9845905303955078,
+      "minimum_thermodynamic_eigenvalue": 0.8963955044746399,
+      "physical_state_relative_error": 2.007714414391432e-07,
       "points": 64,
       "qualification": {
         "counterflow_domain_valid": true,
@@ -128,13 +128,13 @@
       },
       "recovery_failures": 0,
       "relative_field_errors": {
-        "baryon_density_conserved": 2.000899813081762e-07,
-        "carrier_canonical_momentum_x": 9.17559091330197e-06,
-        "carrier_density_conserved": 4.387056286670442e-07,
-        "energy": 1.9874443115117357e-07,
-        "entropy": 2.2111128407085023e-06,
-        "momentum_x": 2.7658804247829924e-06,
-        "tracer": 2.0128508400437226e-07
+        "baryon_density_conserved": 2.0250074811526417e-07,
+        "carrier_canonical_momentum_x": 9.180855559217263e-06,
+        "carrier_density_conserved": 4.3751881936999635e-07,
+        "energy": 1.9756366740349954e-07,
+        "entropy": 2.122555720275854e-06,
+        "momentum_x": 2.7111599032064396e-06,
+        "tracer": 1.9966751794653458e-07
       },
       "steps": 2
     }

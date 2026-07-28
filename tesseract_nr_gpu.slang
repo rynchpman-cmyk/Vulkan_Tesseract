@@ -28,6 +28,7 @@ static const float VT_DENSITY_FLOOR = 1.0e-8;
 static const float VT_CARRIER_FLOOR = 1.0e-8;
 static const float VT_RECOVERY_TOLERANCE = 3.0e-5;
 static const float VT_EPSILON = 1.0e-12;
+static const float VT_CHARACTERISTIC_STEP9 = 1.0e-3;
 
 struct VTConstitutive
 {
@@ -2760,6 +2761,182 @@ VTEigensystem9 vtEigensystem9(in float symbol[81])
     return result;
 }
 
+VTEigensystem9 vtBlockEigensystem9(
+    in float symbol[81],
+    int axis
+)
+{
+    VTEigensystem9 result = {};
+    for (int index = 0; index < 81; ++index)
+        result.symbol[index] = symbol[index];
+    int longitudinal[5] = {
+        0, 1, 2 + axis, 5, 6 + axis
+    };
+    float longitudinalSymbol[25] = {};
+    for (int row = 0; row < 5; ++row)
+    {
+        for (int column = 0; column < 5; ++column)
+        {
+            longitudinalSymbol[row * 5 + column] =
+                symbol[
+                    longitudinal[row] * 9 + longitudinal[column]
+                ];
+        }
+    }
+    VTEigensystem longitudinalSystem = vtEigensystem(
+        longitudinalSymbol
+    );
+    for (int mode = 0; mode < 5; ++mode)
+    {
+        result.values[mode] = longitudinalSystem.values[mode];
+        for (int row = 0; row < 5; ++row)
+        {
+            result.right[
+                longitudinal[row] * 9 + mode
+            ] = longitudinalSystem.right[row * 5 + mode];
+        }
+    }
+
+    int transverse[4] = {};
+    int transverseCount = 0;
+    for (int spatial = 0; spatial < 3; ++spatial)
+    {
+        if (spatial == axis)
+            continue;
+        transverse[transverseCount++] = 2 + spatial;
+        transverse[transverseCount++] = 6 + spatial;
+    }
+    bool transverseReal = true;
+    for (int pair = 0; pair < 2; ++pair)
+    {
+        int first = transverse[2 * pair];
+        int second = transverse[2 * pair + 1];
+        float a = symbol[first * 9 + first];
+        float b = symbol[first * 9 + second];
+        float c = symbol[second * 9 + first];
+        float d = symbol[second * 9 + second];
+        float rawDiscriminant =
+            (a - d) * (a - d) + 4.0 * b * c;
+        transverseReal =
+            transverseReal && rawDiscriminant >= -1.0e-5;
+        float root = sqrt(max(rawDiscriminant, 0.0));
+        float pairValues[2] = {
+            0.5 * (a + d - root),
+            0.5 * (a + d + root)
+        };
+        for (int localMode = 0; localMode < 2; ++localMode)
+        {
+            int mode = 5 + 2 * pair + localMode;
+            float value = pairValues[localMode];
+            result.values[mode] = value;
+            float firstValue = b;
+            float secondValue = value - a;
+            float normSquared =
+                firstValue * firstValue + secondValue * secondValue;
+            if (normSquared < 1.0e-18)
+            {
+                firstValue = value - d;
+                secondValue = c;
+                normSquared =
+                    firstValue * firstValue
+                    + secondValue * secondValue;
+            }
+            if (normSquared < 1.0e-18)
+            {
+                firstValue = localMode == 0 ? 1.0 : 0.0;
+                secondValue = localMode == 0 ? 0.0 : 1.0;
+                normSquared = 1.0;
+            }
+            float inverseNorm = rsqrt(normSquared);
+            firstValue *= inverseNorm;
+            secondValue *= inverseNorm;
+            if (
+                abs(firstValue) >= abs(secondValue)
+                && firstValue < 0.0
+            )
+            {
+                firstValue = -firstValue;
+                secondValue = -secondValue;
+            }
+            else if (
+                abs(secondValue) > abs(firstValue)
+                && secondValue < 0.0
+            )
+            {
+                firstValue = -firstValue;
+                secondValue = -secondValue;
+            }
+            result.right[first * 9 + mode] = firstValue;
+            result.right[second * 9 + mode] = secondValue;
+        }
+    }
+
+    bool inverseValid = vtInvert9(result.right, result.left);
+    result.maximumResidual = 0.0;
+    result.inverseResidual = 0.0;
+    result.maximumSpeed = 0.0;
+    float rightNorm = 0.0;
+    float leftNorm = 0.0;
+    for (int mode = 0; mode < 9; ++mode)
+    {
+        result.maximumSpeed = max(
+            result.maximumSpeed, abs(result.values[mode])
+        );
+        for (int row = 0; row < 9; ++row)
+        {
+            float applied = 0.0;
+            for (int column = 0; column < 9; ++column)
+            {
+                applied +=
+                    symbol[row * 9 + column]
+                    * result.right[column * 9 + mode];
+            }
+            result.maximumResidual = max(
+                result.maximumResidual,
+                abs(
+                    applied
+                    - result.values[mode]
+                    * result.right[row * 9 + mode]
+                )
+            );
+        }
+    }
+    for (int row = 0; row < 9; ++row)
+    {
+        for (int column = 0; column < 9; ++column)
+        {
+            float product = 0.0;
+            for (int inner = 0; inner < 9; ++inner)
+            {
+                product +=
+                    result.left[row * 9 + inner]
+                    * result.right[inner * 9 + column];
+            }
+            result.inverseResidual = max(
+                result.inverseResidual,
+                abs(product - (row == column ? 1.0 : 0.0))
+            );
+            rightNorm +=
+                result.right[row * 9 + column]
+                * result.right[row * 9 + column];
+            leftNorm +=
+                result.left[row * 9 + column]
+                * result.left[row * 9 + column];
+        }
+    }
+    result.conditionEstimate = sqrt(rightNorm * leftNorm);
+    result.valid =
+        longitudinalSystem.valid
+        && transverseReal
+        && inverseValid
+        && isfinite(result.maximumResidual)
+        && isfinite(result.maximumSpeed)
+        && result.maximumResidual < 2.0e-2
+        && result.inverseResidual < 2.0e-2
+        && result.conditionEstimate < 1.0e8;
+    return result;
+}
+
 VTEigensystem9 vtCarterSymbol9(
     in float x[9],
     in VTGeometry3 geometry,
@@ -2775,7 +2952,8 @@ VTEigensystem9 vtCarterSymbol9(
     );
     for (int column = 0; column < 9; ++column)
     {
-        float step = 1.5e-3 * max(1.0, abs(x[column]));
+        float step =
+            VT_CHARACTERISTIC_STEP9 * max(1.0, abs(x[column]));
         float plus[9] = {};
         float minus[9] = {};
         for (int index = 0; index < 9; ++index)
@@ -2826,6 +3004,72 @@ VTEigensystem9 vtCarterSymbol9(
         return vtEigensystem9(symbol);
     vtMatMul9(fluxPathJacobian, inverseTime, symbol);
     return vtEigensystem9(symbol);
+}
+
+void vtCarterPathSymbol9(
+    in float x[9],
+    in VTGeometry3 geometry,
+    int axis,
+    int modelMode,
+    int phaseOverride,
+    out float pathSymbol[81]
+)
+{
+    float timeJacobian[81] = {};
+    float pathPrimitive[81] = {};
+    VTPrincipal9 base = vtPrincipal9(
+        x, geometry, axis, modelMode, phaseOverride
+    );
+    for (int column = 0; column < 9; ++column)
+    {
+        float step =
+            VT_CHARACTERISTIC_STEP9 * max(1.0, abs(x[column]));
+        float plus[9] = {};
+        float minus[9] = {};
+        for (int index = 0; index < 9; ++index)
+        {
+            plus[index] = x[index];
+            minus[index] = x[index];
+        }
+        plus[column] += step;
+        minus[column] -= step;
+        VTPrincipal9 plusPrincipal = vtPrincipal9(
+            plus, geometry, axis, modelMode, phaseOverride
+        );
+        VTPrincipal9 minusPrincipal = vtPrincipal9(
+            minus, geometry, axis, modelMode, phaseOverride
+        );
+        float inverseStep = 1.0 / (2.0 * step);
+        for (int row = 0; row < 9; ++row)
+        {
+            timeJacobian[row * 9 + column] =
+                (
+                    plusPrincipal.conserved[row]
+                    - minusPrincipal.conserved[row]
+                )
+                * inverseStep;
+        }
+        float chiZeroDerivative =
+            (plusPrincipal.chiZero - minusPrincipal.chiZero)
+            * inverseStep;
+        float chiAxisDerivative =
+            (plusPrincipal.chiAxis - minusPrincipal.chiAxis)
+            * inverseStep;
+        pathPrimitive[(6 + axis) * 9 + column] =
+            -base.carrierEulerian
+            * (
+                chiZeroDerivative
+                + base.carrierTransported * chiAxisDerivative
+            );
+    }
+    float inverseTime[81] = {};
+    if (!vtInvert9(timeJacobian, inverseTime))
+    {
+        for (int index = 0; index < 81; ++index)
+            pathSymbol[index] = 0.0;
+        return;
+    }
+    vtMatMul9(pathPrimitive, inverseTime, pathSymbol);
 }
 
 void theory33FullEigensystemKernel(
@@ -3141,13 +3385,1225 @@ int vtGridNeighbor(
     int x = point % nx;
     int y = (point / nx) % ny;
     int z = point / (nx * ny);
+    // Do not use a negative integer remainder here.  It is lowered
+    // inconsistently by some Windows Vulkan compiler paths.  The largest
+    // resident stencil offset is three cells; explicit sign-free corrections
+    // preserve periodic wrapping for every supported active-axis size.
     if (axis == 0)
-        x = (x + offset % nx + nx) % nx;
+    {
+        x += offset;
+        if (x < 0) x += nx;
+        if (x < 0) x += nx;
+        if (x < 0) x += nx;
+        if (x < 0) x += nx;
+        if (x >= nx) x -= nx;
+        if (x >= nx) x -= nx;
+        if (x >= nx) x -= nx;
+        if (x >= nx) x -= nx;
+    }
     else if (axis == 1)
-        y = (y + offset % ny + ny) % ny;
+    {
+        y += offset;
+        if (y < 0) y += ny;
+        if (y < 0) y += ny;
+        if (y < 0) y += ny;
+        if (y < 0) y += ny;
+        if (y >= ny) y -= ny;
+        if (y >= ny) y -= ny;
+        if (y >= ny) y -= ny;
+        if (y >= ny) y -= ny;
+    }
     else
-        z = (z + offset % nz + nz) % nz;
+    {
+        z += offset;
+        if (z < 0) z += nz;
+        if (z < 0) z += nz;
+        if (z < 0) z += nz;
+        if (z < 0) z += nz;
+        if (z >= nz) z -= nz;
+        if (z >= nz) z -= nz;
+        if (z >= nz) z -= nz;
+        if (z >= nz) z -= nz;
+    }
     return x + nx * (y + ny * z);
+}
+
+float vtMixedDerivative(
+    int point,
+    int component,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> field
+)
+{
+    int count = axis == 0 ? nx : (axis == 1 ? ny : nz);
+    if (count <= 1)
+        return 0.0;
+    int plus = vtGridNeighbor(point, axis, 1, nx, ny, nz);
+    int minus = vtGridNeighbor(point, axis, -1, nx, ny, nz);
+    float inverse = axis == 0
+        ? inverseDx
+        : (axis == 1 ? inverseDy : inverseDz);
+    return 0.5 * inverse * (
+        field[plus, component] - field[minus, component]
+    );
+}
+
+float vtMixedPhi(
+    int point,
+    int fieldIndex,
+    ITensor<float, 2> dynamicState,
+    ITensor<float, 2> matterState,
+    ITensor<float, 2> geometryInput
+)
+{
+    float geometryValues[13] = {};
+    for (int index = 0; index < 13; ++index)
+        geometryValues[index] = geometryInput[point, index];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    float rightA =
+        dynamicState[point, 12] / geometry.sqrtDeterminant;
+    float rightB =
+        dynamicState[point, 13] / geometry.sqrtDeterminant
+        + matterState[point, 1] / geometry.sqrtDeterminant;
+    // Inverse of the default Theory 3 Gauss matrix
+    // [[m_A^2+mu^2, -mu^2],[-mu^2,m_B^2+mu^2]]
+    // with m_A=m_B=0.5 and mu^2=0.25.
+    return fieldIndex == 0
+        ? (8.0 * rightA + 4.0 * rightB) / 3.0
+        : (4.0 * rightA + 8.0 * rightB) / 3.0;
+}
+
+float vtMixedFieldStrength(
+    int point,
+    int fieldIndex,
+    int row,
+    int column,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> dynamicState
+)
+{
+    int offset = fieldIndex == 0 ? 0 : 6;
+    return
+        vtMixedDerivative(
+            point, offset + column, row,
+            nx, ny, nz, inverseDx, inverseDy, inverseDz,
+            dynamicState
+        )
+        - vtMixedDerivative(
+            point, offset + row, column,
+            nx, ny, nz, inverseDx, inverseDy, inverseDz,
+            dynamicState
+        );
+}
+
+float vtMixedMomentumFlux(
+    int point,
+    int fieldIndex,
+    int derivativeAxis,
+    int component,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> dynamicState,
+    ITensor<float, 2> geometryInput
+)
+{
+    float geometryValues[13] = {};
+    for (int index = 0; index < 13; ++index)
+        geometryValues[index] = geometryInput[point, index];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    float raised = 0.0;
+    for (int lowerRow = 0; lowerRow < 3; ++lowerRow)
+    {
+        for (int lowerColumn = 0; lowerColumn < 3; ++lowerColumn)
+        {
+            raised +=
+                geometry.inverseMetric[
+                    derivativeAxis * 3 + lowerRow
+                ]
+                * geometry.inverseMetric[
+                    component * 3 + lowerColumn
+                ]
+                * vtMixedFieldStrength(
+                    point, fieldIndex, lowerRow, lowerColumn,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    dynamicState
+                );
+        }
+    }
+    return geometry.lapse * geometry.sqrtDeterminant * raised;
+}
+
+float vtMixedCurrent(
+    int point,
+    int fieldIndex,
+    int axis,
+    ITensor<float, 2> dynamicState,
+    ITensor<float, 2> primitive,
+    ITensor<float, 2> geometryInput
+)
+{
+    float geometryValues[13] = {};
+    for (int index = 0; index < 13; ++index)
+        geometryValues[index] = geometryInput[point, index];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    float aUp = 0.0;
+    float bUp = 0.0;
+    for (int column = 0; column < 3; ++column)
+    {
+        aUp +=
+            geometry.inverseMetric[axis * 3 + column]
+            * dynamicState[point, column];
+        bUp +=
+            geometry.inverseMetric[axis * 3 + column]
+            * dynamicState[point, 6 + column];
+    }
+    if (fieldIndex == 0)
+        return 0.5 * aUp - 0.25 * bUp;
+    float densityD = exp(clamp(primitive[point, 5], -20.0, 4.0));
+    float targetCurrent = densityD * primitive[point, 6 + axis];
+    return -0.25 * aUp + 0.5 * bUp - targetCurrent;
+}
+
+void theory33MixedVectorInputKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> dynamicState,
+    ITensor<float, 2> geometryInput,
+    IWTensor<float, 2> vectorInput
+)
+{
+    for (int component = 0; component < 14; ++component)
+        vectorInput[point, component] = dynamicState[point, component];
+    float geometryValues[13] = {};
+    for (int index = 0; index < 13; ++index)
+        geometryValues[index] = geometryInput[point, index];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    for (int fieldIndex = 0; fieldIndex < 2; ++fieldIndex)
+    {
+        int output = 14 + 3 * fieldIndex;
+        vectorInput[point, output] =
+            vtMixedFieldStrength(
+                point, fieldIndex, 1, 2,
+                nx, ny, nz, inverseDx, inverseDy, inverseDz,
+                dynamicState
+            )
+            / geometry.sqrtDeterminant;
+        vectorInput[point, output + 1] =
+            vtMixedFieldStrength(
+                point, fieldIndex, 2, 0,
+                nx, ny, nz, inverseDx, inverseDy, inverseDz,
+                dynamicState
+            )
+            / geometry.sqrtDeterminant;
+        vectorInput[point, output + 2] =
+            vtMixedFieldStrength(
+                point, fieldIndex, 0, 1,
+                nx, ny, nz, inverseDx, inverseDy, inverseDz,
+                dynamicState
+            )
+            / geometry.sqrtDeterminant;
+    }
+}
+
+void theory33MixedVectorRhsKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float cleaningDamping,
+    ITensor<float, 2> dynamicState,
+    ITensor<float, 2> matterState,
+    ITensor<float, 2> primitive,
+    ITensor<float, 2> geometryInput,
+    IWTensor<float, 2> rhs
+)
+{
+    float geometryValues[13] = {};
+    for (int index = 0; index < 13; ++index)
+        geometryValues[index] = geometryInput[point, index];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    float inverseSpacing[3] = {inverseDx, inverseDy, inverseDz};
+    int axisCount[3] = {nx, ny, nz};
+    float shiftDivergence = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (axisCount[axis] > 1)
+        {
+            shiftDivergence += vtMixedDerivative(
+                point, 10 + axis, axis,
+                nx, ny, nz, inverseDx, inverseDy, inverseDz,
+                geometryInput
+            );
+        }
+    }
+    float aUp[3] = {};
+    float bUp[3] = {};
+    for (int row = 0; row < 3; ++row)
+    {
+        for (int column = 0; column < 3; ++column)
+        {
+            aUp[row] +=
+                geometry.inverseMetric[row * 3 + column]
+                * dynamicState[point, column];
+            bUp[row] +=
+                geometry.inverseMetric[row * 3 + column]
+                * dynamicState[point, 6 + column];
+        }
+    }
+    for (int fieldIndex = 0; fieldIndex < 2; ++fieldIndex)
+    {
+        int potentialOffset = fieldIndex == 0 ? 0 : 6;
+        int momentumOffset = fieldIndex == 0 ? 3 : 9;
+        int longitudinalIndex = 12 + fieldIndex;
+        int cleaningIndex = 14 + fieldIndex;
+        float phi = vtMixedPhi(
+            point, fieldIndex, dynamicState, matterState, geometryInput
+        );
+        for (int component = 0; component < 3; ++component)
+        {
+            float piLower = 0.0;
+            for (int column = 0; column < 3; ++column)
+            {
+                piLower +=
+                    geometry.metric[component * 3 + column]
+                    * dynamicState[point, momentumOffset + column];
+            }
+            float potentialRhs =
+                geometry.lapse * piLower / geometry.sqrtDeterminant;
+            float momentumRhs = 0.0;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                if (axisCount[axis] <= 1)
+                    continue;
+                int plus = vtGridNeighbor(
+                    point, axis, 1, nx, ny, nz
+                );
+                int minus = vtGridNeighbor(
+                    point, axis, -1, nx, ny, nz
+                );
+                float plusPhi = vtMixedPhi(
+                    plus, fieldIndex,
+                    dynamicState, matterState, geometryInput
+                );
+                float minusPhi = vtMixedPhi(
+                    minus, fieldIndex,
+                    dynamicState, matterState, geometryInput
+                );
+                potentialRhs -=
+                    component == axis
+                    ? 0.5 * inverseSpacing[axis]
+                    * (
+                        geometryInput[plus, 9] * plusPhi
+                        - geometryInput[minus, 9] * minusPhi
+                    )
+                    : 0.0;
+                potentialRhs +=
+                    geometry.shift[axis]
+                    * vtMixedDerivative(
+                        point, potentialOffset + component, axis,
+                        nx, ny, nz,
+                        inverseDx, inverseDy, inverseDz,
+                        dynamicState
+                    );
+                potentialRhs +=
+                    dynamicState[point, potentialOffset + axis]
+                    * vtMixedDerivative(
+                        point, 10 + axis, component,
+                        nx, ny, nz,
+                        inverseDx, inverseDy, inverseDz,
+                        geometryInput
+                    );
+                float plusFlux = vtMixedMomentumFlux(
+                    plus, fieldIndex, axis, component,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    dynamicState, geometryInput
+                );
+                float minusFlux = vtMixedMomentumFlux(
+                    minus, fieldIndex, axis, component,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    dynamicState, geometryInput
+                );
+                momentumRhs +=
+                    0.5 * inverseSpacing[axis]
+                    * (plusFlux - minusFlux);
+                momentumRhs +=
+                    geometry.shift[axis]
+                    * vtMixedDerivative(
+                        point, momentumOffset + component, axis,
+                        nx, ny, nz,
+                        inverseDx, inverseDy, inverseDz,
+                        dynamicState
+                    );
+                momentumRhs -=
+                    dynamicState[point, momentumOffset + axis]
+                    * vtMixedDerivative(
+                        point, 10 + component, axis,
+                        nx, ny, nz,
+                        inverseDx, inverseDy, inverseDz,
+                        geometryInput
+                    );
+            }
+            momentumRhs +=
+                dynamicState[point, momentumOffset + component]
+                * shiftDivergence;
+            float cleaningGradient = 0.0;
+            if (axisCount[component] > 1)
+            {
+                int plus = vtGridNeighbor(
+                    point, component, 1, nx, ny, nz
+                );
+                int minus = vtGridNeighbor(
+                    point, component, -1, nx, ny, nz
+                );
+                cleaningGradient =
+                    0.5 * inverseSpacing[component]
+                    * (
+                        geometryInput[plus, 9]
+                        * dynamicState[plus, cleaningIndex]
+                        - geometryInput[minus, 9]
+                        * dynamicState[minus, cleaningIndex]
+                    );
+            }
+            float raisedCleaning = 0.0;
+            for (int column = 0; column < 3; ++column)
+            {
+                if (axisCount[column] <= 1)
+                    continue;
+                int plus = vtGridNeighbor(
+                    point, column, 1, nx, ny, nz
+                );
+                int minus = vtGridNeighbor(
+                    point, column, -1, nx, ny, nz
+                );
+                float gradient =
+                    0.5 * inverseSpacing[column]
+                    * (
+                        geometryInput[plus, 9]
+                        * dynamicState[plus, cleaningIndex]
+                        - geometryInput[minus, 9]
+                        * dynamicState[minus, cleaningIndex]
+                    );
+                raisedCleaning +=
+                    geometry.inverseMetric[component * 3 + column]
+                    * gradient;
+            }
+            momentumRhs += geometry.sqrtDeterminant * raisedCleaning;
+            float mixing = aUp[component] - bUp[component];
+            if (fieldIndex == 0)
+            {
+                momentumRhs -=
+                    geometry.lapse * geometry.sqrtDeterminant
+                    * (0.25 * aUp[component] + 0.25 * mixing);
+            }
+            else
+            {
+                float densityD = exp(
+                    clamp(primitive[point, 5], -20.0, 4.0)
+                );
+                float targetCurrent =
+                    densityD * primitive[point, 6 + component];
+                momentumRhs -=
+                    geometry.lapse * geometry.sqrtDeterminant
+                    * (
+                        0.25 * bUp[component]
+                        - 0.25 * mixing
+                        - targetCurrent
+                    );
+            }
+            rhs[point, potentialOffset + component] = potentialRhs;
+            rhs[point, momentumOffset + component] = momentumRhs;
+        }
+        float charge =
+            dynamicState[point, longitudinalIndex]
+            / geometry.sqrtDeterminant;
+        float longitudinalRhs = 0.0;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (axisCount[axis] <= 1)
+                continue;
+            int plus = vtGridNeighbor(
+                point, axis, 1, nx, ny, nz
+            );
+            int minus = vtGridNeighbor(
+                point, axis, -1, nx, ny, nz
+            );
+            float plusGeometryValues[13] = {};
+            float minusGeometryValues[13] = {};
+            for (int index = 0; index < 13; ++index)
+            {
+                plusGeometryValues[index] =
+                    geometryInput[plus, index];
+                minusGeometryValues[index] =
+                    geometryInput[minus, index];
+            }
+            VTGeometry3 plusGeometry = vtGeometry3(
+                plusGeometryValues
+            );
+            VTGeometry3 minusGeometry = vtGeometry3(
+                minusGeometryValues
+            );
+            float plusCharge =
+                dynamicState[plus, longitudinalIndex]
+                / plusGeometry.sqrtDeterminant;
+            float minusCharge =
+                dynamicState[minus, longitudinalIndex]
+                / minusGeometry.sqrtDeterminant;
+            float plusFlux =
+                plusGeometry.sqrtDeterminant
+                * (
+                    plusGeometry.lapse
+                    * vtMixedCurrent(
+                        plus, fieldIndex, axis,
+                        dynamicState, primitive, geometryInput
+                    )
+                    - plusGeometry.shift[axis] * plusCharge
+                );
+            float minusFlux =
+                minusGeometry.sqrtDeterminant
+                * (
+                    minusGeometry.lapse
+                    * vtMixedCurrent(
+                        minus, fieldIndex, axis,
+                        dynamicState, primitive, geometryInput
+                    )
+                    - minusGeometry.shift[axis] * minusCharge
+                );
+            longitudinalRhs -=
+                0.5 * inverseSpacing[axis]
+                * (plusFlux - minusFlux);
+        }
+        rhs[point, longitudinalIndex] = longitudinalRhs;
+        float divergencePi = 0.0;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            divergencePi += vtMixedDerivative(
+                point, momentumOffset + axis, axis,
+                nx, ny, nz,
+                inverseDx, inverseDy, inverseDz,
+                dynamicState
+            );
+        }
+        float constraint =
+            -divergencePi / geometry.sqrtDeterminant + charge;
+        float cleaningRhs =
+            -geometry.lapse
+            * (
+                constraint
+                + cleaningDamping
+                * dynamicState[point, cleaningIndex]
+            );
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            cleaningRhs +=
+                geometry.shift[axis]
+                * vtMixedDerivative(
+                    point, cleaningIndex, axis,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    dynamicState
+                );
+        }
+        rhs[point, cleaningIndex] = cleaningRhs;
+    }
+}
+
+void theory33MixedVectorStageKernel(
+    int point,
+    float dt,
+    float baseWeight,
+    float evolvedWeight,
+    ITensor<float, 2> baseState,
+    ITensor<float, 2> stageState,
+    ITensor<float, 2> rhs,
+    IWTensor<float, 2> output
+)
+{
+    for (int component = 0; component < 16; ++component)
+    {
+        output[point, component] =
+            baseWeight * baseState[point, component]
+            + evolvedWeight
+            * (stageState[point, component] + dt * rhs[point, component]);
+    }
+}
+
+// -------------------------------------------------------------------------
+// Periodic CMC/Picard initial data
+//
+// The elliptic state shares the evolution ABI's float32 precision. Global
+// reductions are deterministic; qualification records the resulting
+// residual floor separately from the float64 CPU oracle.
+// Columns are psi, W^x, W^y, W^z.
+
+float vtCMCInverseSpacing(
+    int axis,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz
+)
+{
+    return axis == 0
+        ? inverseDx
+        : (axis == 1 ? inverseDy : inverseDz);
+}
+
+int vtCMCAxisCount(int axis, int nx, int ny, int nz)
+{
+    return axis == 0 ? nx : (axis == 1 ? ny : nz);
+}
+
+float vtCMCDerivative(
+    int point,
+    int component,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> state
+)
+{
+    if (vtCMCAxisCount(axis, nx, ny, nz) <= 1)
+        return 0.0;
+    int plus = vtGridNeighbor(point, axis, 1, nx, ny, nz);
+    int minus = vtGridNeighbor(point, axis, -1, nx, ny, nz);
+    return 0.5
+        * vtCMCInverseSpacing(
+            axis, inverseDx, inverseDy, inverseDz
+        )
+        * (state[plus, component] - state[minus, component]);
+}
+
+float vtCMCSecondDerivative(
+    int point,
+    int component,
+    int firstAxis,
+    int secondAxis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> state
+)
+{
+    if (
+        vtCMCAxisCount(firstAxis, nx, ny, nz) <= 1
+        || vtCMCAxisCount(secondAxis, nx, ny, nz) <= 1
+    )
+        return 0.0;
+    float firstInverse = vtCMCInverseSpacing(
+        firstAxis, inverseDx, inverseDy, inverseDz
+    );
+    float secondInverse = vtCMCInverseSpacing(
+        secondAxis, inverseDx, inverseDy, inverseDz
+    );
+    if (firstAxis == secondAxis)
+    {
+        int plus = vtGridNeighbor(
+            point, firstAxis, 2, nx, ny, nz
+        );
+        int minus = vtGridNeighbor(
+            point, firstAxis, -2, nx, ny, nz
+        );
+        return 0.25
+            * firstInverse
+            * firstInverse
+            * (
+                state[plus, component]
+                - 2.0 * state[point, component]
+                + state[minus, component]
+            );
+    }
+    int plusPlus = vtGridNeighbor(
+        vtGridNeighbor(point, firstAxis, 1, nx, ny, nz),
+        secondAxis, 1, nx, ny, nz
+    );
+    int plusMinus = vtGridNeighbor(
+        vtGridNeighbor(point, firstAxis, 1, nx, ny, nz),
+        secondAxis, -1, nx, ny, nz
+    );
+    int minusPlus = vtGridNeighbor(
+        vtGridNeighbor(point, firstAxis, -1, nx, ny, nz),
+        secondAxis, 1, nx, ny, nz
+    );
+    int minusMinus = vtGridNeighbor(
+        vtGridNeighbor(point, firstAxis, -1, nx, ny, nz),
+        secondAxis, -1, nx, ny, nz
+    );
+    return 0.25
+        * firstInverse
+        * secondInverse
+        * (
+            state[plusPlus, component]
+            - state[plusMinus, component]
+            - state[minusPlus, component]
+            + state[minusMinus, component]
+        );
+}
+
+float vtCMCLaplacian(
+    int point,
+    int component,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> state
+)
+{
+    float result = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (vtCMCAxisCount(axis, nx, ny, nz) <= 1)
+            continue;
+        int plus = vtGridNeighbor(point, axis, 1, nx, ny, nz);
+        int minus = vtGridNeighbor(point, axis, -1, nx, ny, nz);
+        float inverse = vtCMCInverseSpacing(
+            axis, inverseDx, inverseDy, inverseDz
+        );
+        result += inverse * inverse * (
+            state[plus, component]
+            - 2.0 * state[point, component]
+            + state[minus, component]
+        );
+    }
+    return result;
+}
+
+void vtCMCAbar(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> state,
+    out float Abar[9]
+)
+{
+    float divergence = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        divergence += vtCMCDerivative(
+            point, 1 + axis, axis,
+            nx, ny, nz, inverseDx, inverseDy, inverseDz,
+            state
+        );
+    }
+    for (int row = 0; row < 3; ++row)
+    {
+        for (int column = 0; column < 3; ++column)
+        {
+            Abar[row * 3 + column] =
+                vtCMCDerivative(
+                    point, 1 + row, column,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    state
+                )
+                + vtCMCDerivative(
+                    point, 1 + column, row,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    state
+                )
+                - (row == column
+                    ? (2.0 / 3.0) * divergence
+                    : 0.0);
+        }
+    }
+}
+
+void vtCMCResidual(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float kappaGravity,
+    ITensor<float, 2> state,
+    ITensor<float, 2> matterStress,
+    ITensor<float, 2> control,
+    out float hamiltonian,
+    out float momentum[3]
+)
+{
+    float Abar[9] = {};
+    vtCMCAbar(
+        point, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz,
+        state, Abar
+    );
+    float AbarSquared = 0.0;
+    for (int component = 0; component < 9; ++component)
+        AbarSquared += Abar[component] * Abar[component];
+    float psi = max(state[point, 0], 1.0e-12);
+    float psi5 = pow(psi, 5.0);
+    float traceKSquared = control[0, 0];
+    hamiltonian =
+        vtCMCLaplacian(
+            point, 0, nx, ny, nz,
+            inverseDx, inverseDy, inverseDz, state
+        )
+        + 0.125 * AbarSquared * pow(psi, -7.0)
+        - (traceKSquared / 12.0) * psi5
+        + 0.25
+        * kappaGravity
+        * float(matterStress[point, 0])
+        * psi5;
+    for (int row = 0; row < 3; ++row)
+    {
+        float vectorLaplacian = vtCMCLaplacian(
+            point, 1 + row, nx, ny, nz,
+            inverseDx, inverseDy, inverseDz, state
+        );
+        float gradientDivergence = 0.0;
+        for (int inner = 0; inner < 3; ++inner)
+        {
+            gradientDivergence += vtCMCSecondDerivative(
+                point, 1 + inner, row, inner,
+                nx, ny, nz,
+                inverseDx, inverseDy, inverseDz,
+                state
+            );
+        }
+        momentum[row] =
+            vectorLaplacian
+            + gradientDivergence / 3.0
+            - kappaGravity
+            * pow(psi, 6.0)
+            * float(matterStress[point, 1 + row]);
+    }
+}
+
+void theory33CMCTraceKernel(
+    int point,
+    int numberPoints,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float kappaGravity,
+    int expanding,
+    ITensor<float, 2> state,
+    ITensor<float, 2> matterStress,
+    IWTensor<float, 2> control
+)
+{
+    float Aterm = 0.0;
+    float rhoTerm = 0.0;
+    float denominator = 0.0;
+    for (int cell = 0; cell < numberPoints; ++cell)
+    {
+        float Abar[9] = {};
+        vtCMCAbar(
+            cell, nx, ny, nz,
+            inverseDx, inverseDy, inverseDz,
+            state, Abar
+        );
+        float AbarSquared = 0.0;
+        for (int component = 0; component < 9; ++component)
+            AbarSquared += Abar[component] * Abar[component];
+        float psi = max(state[cell, 0], 1.0e-12);
+        float psi5 = pow(psi, 5.0);
+        Aterm += AbarSquared * pow(psi, -7.0);
+        rhoTerm += float(matterStress[cell, 0]) * psi5;
+        denominator += psi5;
+    }
+    float traceKSquared = (
+        1.5 * Aterm + 3.0 * kappaGravity * rhoTerm
+    ) / max(denominator, 1.0e-30);
+    control[0, 0] = max(traceKSquared, 0.0);
+    control[0, 1] =
+        (expanding != 0 ? -1.0 : 1.0)
+        * sqrt(max(traceKSquared, 0.0));
+}
+
+void theory33CMCUpdateKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float kappaGravity,
+    float pseudoTimeStep,
+    float minimumConformalFactor,
+    float maximumConformalFactor,
+    ITensor<float, 2> state,
+    ITensor<float, 2> matterStress,
+    ITensor<float, 2> control,
+    IWTensor<float, 2> candidate
+)
+{
+    float hamiltonian;
+    float momentum[3] = {};
+    vtCMCResidual(
+        point, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz,
+        kappaGravity, state, matterStress, control,
+        hamiltonian, momentum
+    );
+    candidate[point, 0] = clamp(
+        state[point, 0] + pseudoTimeStep * hamiltonian,
+        minimumConformalFactor,
+        maximumConformalFactor
+    );
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        candidate[point, 1 + axis] =
+            state[point, 1 + axis]
+            + pseudoTimeStep * momentum[axis];
+    }
+}
+
+void theory33CMCMeanKernel(
+    int point,
+    int numberPoints,
+    ITensor<float, 2> candidate,
+    IWTensor<float, 2> control
+)
+{
+    float sums[4] = {};
+    for (int cell = 0; cell < numberPoints; ++cell)
+    {
+        for (int component = 0; component < 4; ++component)
+            sums[component] += candidate[cell, component];
+    }
+    for (int component = 0; component < 4; ++component)
+        control[0, 2 + component] = sums[component] / numberPoints;
+}
+
+void theory33CMCNormalizeKernel(
+    int point,
+    ITensor<float, 2> candidate,
+    ITensor<float, 2> control,
+    IWTensor<float, 2> state
+)
+{
+    state[point, 0] =
+        candidate[point, 0] / max(control[0, 2], 1.0e-30);
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        state[point, 1 + axis] =
+            candidate[point, 1 + axis] - control[0, 3 + axis];
+    }
+}
+
+void theory33CMCResidualKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float kappaGravity,
+    ITensor<float, 2> state,
+    ITensor<float, 2> matterStress,
+    ITensor<float, 2> control,
+    IWTensor<float, 2> residual
+)
+{
+    float hamiltonian;
+    float momentum[3] = {};
+    vtCMCResidual(
+        point, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz,
+        kappaGravity, state, matterStress, control,
+        hamiltonian, momentum
+    );
+    residual[point, 0] = hamiltonian * hamiltonian;
+    residual[point, 1] =
+        momentum[0] * momentum[0]
+        + momentum[1] * momentum[1]
+        + momentum[2] * momentum[2];
+}
+
+void theory33CMCReduceResidualKernel(
+    int point,
+    int numberPoints,
+    ITensor<float, 2> state,
+    ITensor<float, 2> residual,
+    IWTensor<float, 2> control
+)
+{
+    float hamiltonianSquared = 0.0;
+    float momentumSquared = 0.0;
+    float minimumPsi = 1.0e30;
+    float maximumPsi = -1.0e30;
+    for (int cell = 0; cell < numberPoints; ++cell)
+    {
+        hamiltonianSquared += residual[cell, 0];
+        momentumSquared += residual[cell, 1];
+        minimumPsi = min(minimumPsi, state[cell, 0]);
+        maximumPsi = max(maximumPsi, state[cell, 0]);
+    }
+    control[0, 6] = sqrt(hamiltonianSquared / numberPoints);
+    control[0, 7] = sqrt(momentumSquared / numberPoints);
+    control[0, 8] = minimumPsi;
+    control[0, 9] = maximumPsi;
+}
+
+void theory33CMCPackCCZ4Kernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    ITensor<float, 2> state,
+    ITensor<float, 2> control,
+    IWTensor<float, 2> ccz4State
+)
+{
+    for (int component = 0; component < 31; ++component)
+        ccz4State[point, component] = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+        ccz4State[point, axis * 3 + axis] = 1.0;
+    float Abar[9] = {};
+    vtCMCAbar(
+        point, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz,
+        state, Abar
+    );
+    float psi = max(state[point, 0], 1.0e-12);
+    float scaleA = pow(psi, -6.0);
+    for (int component = 0; component < 9; ++component)
+        ccz4State[point, 9 + component] =
+            float(scaleA * Abar[component]);
+    ccz4State[point, 18] = float(pow(psi, -2.0));
+    ccz4State[point, 19] = float(control[0, 1]);
+    ccz4State[point, 24] = 1.0;
+}
+
+void theory33BalancedCounterflowKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    int modelMode,
+    ITensor<float, 2> geometryInput,
+    IWTensor<float, 2> primitive,
+    IWTensor<float, 2> audit
+)
+{
+    int coordinates[3] = {
+        point % nx,
+        (point / nx) % ny,
+        point / (nx * ny)
+    };
+    int counts[3] = { nx, ny, nz };
+    int dimensions = (nx > 1 ? 1 : 0)
+        + (ny > 1 ? 1 : 0)
+        + (nz > 1 ? 1 : 0);
+    float phases[3] = {};
+    float modulation = 0.0;
+    float sineProduct = 1.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (counts[axis] <= 1)
+            continue;
+        phases[axis] =
+            6.283185307179586
+            * float(coordinates[axis])
+            / float(counts[axis]);
+        modulation += cos(phases[axis]);
+        sineProduct *= sin(phases[axis]);
+    }
+    modulation /= max(float(dimensions), 1.0);
+    if (dimensions > 1)
+        modulation += 0.25 * sineProduct;
+    float density = 0.1 * (1.0 + 0.01 * modulation);
+    float carrierDensity = 0.005 * (1.0 + 0.01 * modulation);
+    float internalEnergy = 0.15;
+    float entropy = log(max(
+        (VT_GAMMA_AD - 1.0)
+        * density
+        * internalEnergy
+        / pow(density, VT_GAMMA_AD),
+        VT_EPSILON
+    )) / (VT_GAMMA_AD - 1.0);
+    float carrierVelocity[3] = {};
+    carrierVelocity[0] = 0.125 + 0.001 * cos(phases[0]);
+    if (ny > 1)
+    {
+        carrierVelocity[1] =
+            0.025 * sin(phases[0]) + 0.01 * cos(phases[1]);
+    }
+    if (nz > 1)
+    {
+        carrierVelocity[2] =
+            0.025 * sin(phases[1]) + 0.01 * cos(phases[2]);
+    }
+    float geometryValues[13] = {};
+    for (int component = 0; component < 13; ++component)
+        geometryValues[component] = geometryInput[point, component];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    float carrierSpeedSquared = vtMetricDot3(
+        carrierVelocity, geometry.metric, carrierVelocity
+    );
+    float carrierW = 1.0 / sqrt(max(1.0 - carrierSpeedSquared, 1.0e-8));
+    float lower = -0.6;
+    float upper = 0.1;
+    for (int iteration = 0; iteration < 60; ++iteration)
+    {
+        float middle = 0.5 * (lower + upper);
+        float candidate[9] = {};
+        candidate[0] = log(density);
+        candidate[1] = entropy;
+        float fluidVelocity[3] = {};
+        for (int axis = 0; axis < 3; ++axis)
+            fluidVelocity[axis] = middle * carrierVelocity[axis];
+        float fluidSpeedSquared = vtMetricDot3(
+            fluidVelocity, geometry.metric, fluidVelocity
+        );
+        float fluidW = 1.0 / sqrt(
+            max(1.0 - fluidSpeedSquared, 1.0e-8)
+        );
+        for (int axis = 0; axis < 3; ++axis)
+            candidate[2 + axis] = fluidW * fluidVelocity[axis];
+        candidate[5] = log(carrierDensity);
+        for (int axis = 0; axis < 3; ++axis)
+            candidate[6 + axis] = carrierW * carrierVelocity[axis];
+        VTPrincipal9 principal = vtPrincipal9(
+            candidate, geometry, 0, modelMode, -1
+        );
+        float projection = 0.0;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            projection +=
+                principal.conserved[2 + axis]
+                * carrierVelocity[axis];
+        }
+        if (projection > 0.0)
+            upper = middle;
+        else
+            lower = middle;
+    }
+    float multiplier = 0.5 * (lower + upper);
+    float fluidVelocity[3] = {};
+    for (int axis = 0; axis < 3; ++axis)
+        fluidVelocity[axis] = multiplier * carrierVelocity[axis];
+    float fluidSpeedSquared = vtMetricDot3(
+        fluidVelocity, geometry.metric, fluidVelocity
+    );
+    float fluidW = 1.0 / sqrt(max(1.0 - fluidSpeedSquared, 1.0e-8));
+    float finalValues[9] = {};
+    finalValues[0] = log(density);
+    finalValues[1] = entropy;
+    for (int axis = 0; axis < 3; ++axis)
+        finalValues[2 + axis] = fluidW * fluidVelocity[axis];
+    finalValues[5] = log(carrierDensity);
+    for (int axis = 0; axis < 3; ++axis)
+        finalValues[6 + axis] = carrierW * carrierVelocity[axis];
+    for (int component = 0; component < 9; ++component)
+        primitive[point, component] = finalValues[component];
+    VTPrincipal9 finalPrincipal = vtPrincipal9(
+        finalValues, geometry, 0, modelMode, -1
+    );
+    float maximumMomentum = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        maximumMomentum = max(
+            maximumMomentum,
+            abs(
+                finalPrincipal.conserved[2 + axis]
+                / geometry.sqrtDeterminant
+            )
+        );
+    }
+    audit[point, 0] = maximumMomentum;
+    audit[point, 1] = finalPrincipal.phaseTwo ? 1.0 : 0.0;
+    audit[point, 2] = finalPrincipal.switchingMargin;
+}
+
+void theory33CounterflowAuditReduceKernel(
+    int point,
+    int numberPoints,
+    ITensor<float, 2> audit,
+    IWTensor<float, 2> control
+)
+{
+    float maximumMomentum = 0.0;
+    for (int cell = 0; cell < numberPoints; ++cell)
+    {
+        maximumMomentum = max(
+            maximumMomentum, float(abs(audit[cell, 0]))
+        );
+    }
+    control[0, 11] = maximumMomentum;
+}
+
+void theory33CMCStoreSourceKernel(
+    int point,
+    ITensor<float, 2> matterStress,
+    IWTensor<float, 2> storedSource
+)
+{
+    for (int component = 0; component < 4; ++component)
+        storedSource[point, component] = matterStress[point, component];
+}
+
+void theory33CMCSourceChangeKernel(
+    int point,
+    int numberPoints,
+    ITensor<float, 2> matterStress,
+    ITensor<float, 2> storedSource,
+    IWTensor<float, 2> control
+)
+{
+    float differenceSquared = 0.0;
+    float sourceSquared = 0.0;
+    for (int cell = 0; cell < numberPoints; ++cell)
+    {
+        float current = float(matterStress[cell, 0]);
+        float difference =
+            current - float(storedSource[cell, 0]);
+        differenceSquared += difference * difference;
+        sourceSquared += current * current;
+    }
+    control[0, 10] = sqrt(differenceSquared)
+        / max(sqrt(sourceSquared), 1.0e-30);
 }
 
 float vtCCZ4InverseSpacing(
@@ -3177,15 +4633,40 @@ float vtCCZ4Derivative(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     ITensor<float, 2> state
 )
 {
     if (vtCCZ4AxisCount(axis, nx, ny, nz) <= 1)
         return 0.0;
+    float inverse = vtCCZ4InverseSpacing(
+        axis, inverseDx, inverseDy, inverseDz
+    );
+    if (derivativeOrder == 4)
+    {
+        int minusTwo = vtGridNeighbor(
+            point, axis, -2, nx, ny, nz
+        );
+        int minusOne = vtGridNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        int plusOne = vtGridNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int plusTwo = vtGridNeighbor(
+            point, axis, 2, nx, ny, nz
+        );
+        return (inverse / 12.0) * (
+            state[minusTwo, component]
+            - 8.0 * state[minusOne, component]
+            + 8.0 * state[plusOne, component]
+            - state[plusTwo, component]
+        );
+    }
     int plus = vtGridNeighbor(point, axis, 1, nx, ny, nz);
     int minus = vtGridNeighbor(point, axis, -1, nx, ny, nz);
     return 0.5
-        * vtCCZ4InverseSpacing(axis, inverseDx, inverseDy, inverseDz)
+        * inverse
         * (state[plus, component] - state[minus, component]);
 }
 
@@ -3200,6 +4681,7 @@ float vtCCZ4SecondDerivative(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     ITensor<float, 2> state
 )
 {
@@ -3214,6 +4696,33 @@ float vtCCZ4SecondDerivative(
     float secondInverse = vtCCZ4InverseSpacing(
         secondAxis, inverseDx, inverseDy, inverseDz
     );
+    if (derivativeOrder == 4)
+    {
+        int offsets[4] = { -2, -1, 1, 2 };
+        float weights[4] = { 1.0, -8.0, 8.0, -1.0 };
+        float result = 0.0;
+        for (int first = 0; first < 4; ++first)
+        {
+            int shifted = vtGridNeighbor(
+                point, firstAxis, offsets[first], nx, ny, nz
+            );
+            for (int second = 0; second < 4; ++second)
+            {
+                int sample = vtGridNeighbor(
+                    shifted, secondAxis, offsets[second],
+                    nx, ny, nz
+                );
+                result +=
+                    weights[first]
+                    * weights[second]
+                    * state[sample, component];
+            }
+        }
+        return result
+            * firstInverse
+            * secondInverse
+            / 144.0;
+    }
     if (firstAxis == secondAxis)
     {
         int plus = vtGridNeighbor(
@@ -3289,15 +4798,48 @@ float vtCCZ4MetricDerivative(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     ITensor<float, 2> state
 )
 {
     if (vtCCZ4AxisCount(axis, nx, ny, nz) <= 1)
         return 0.0;
+    float inverse = vtCCZ4InverseSpacing(
+        axis, inverseDx, inverseDy, inverseDz
+    );
+    if (derivativeOrder == 4)
+    {
+        int minusTwo = vtGridNeighbor(
+            point, axis, -2, nx, ny, nz
+        );
+        int minusOne = vtGridNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        int plusOne = vtGridNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int plusTwo = vtGridNeighbor(
+            point, axis, 2, nx, ny, nz
+        );
+        return (inverse / 12.0) * (
+            vtCCZ4MetricValue(
+                minusTwo, row, column, physical, state
+            )
+            - 8.0 * vtCCZ4MetricValue(
+                minusOne, row, column, physical, state
+            )
+            + 8.0 * vtCCZ4MetricValue(
+                plusOne, row, column, physical, state
+            )
+            - vtCCZ4MetricValue(
+                plusTwo, row, column, physical, state
+            )
+        );
+    }
     int plus = vtGridNeighbor(point, axis, 1, nx, ny, nz);
     int minus = vtGridNeighbor(point, axis, -1, nx, ny, nz);
     return 0.5
-        * vtCCZ4InverseSpacing(axis, inverseDx, inverseDy, inverseDz)
+        * inverse
         * (
             vtCCZ4MetricValue(
                 plus, row, column, physical, state
@@ -3317,6 +4859,7 @@ void vtCCZ4Connection(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     ITensor<float, 2> state,
     out float metric[9],
     out float inverseMetric[9],
@@ -3357,18 +4900,21 @@ void vtCCZ4Connection(
                                 point, inner, second, first,
                                 physical, nx, ny, nz,
                                 inverseDx, inverseDy, inverseDz,
+                                derivativeOrder,
                                 state
                             )
                             + vtCCZ4MetricDerivative(
                                 point, inner, first, second,
                                 physical, nx, ny, nz,
                                 inverseDx, inverseDy, inverseDz,
+                                derivativeOrder,
                                 state
                             )
                             - vtCCZ4MetricDerivative(
                                 point, first, second, inner,
                                 physical, nx, ny, nz,
                                 inverseDx, inverseDy, inverseDz,
+                                derivativeOrder,
                                 state
                             )
                         );
@@ -3379,6 +4925,60 @@ void vtCCZ4Connection(
     }
 }
 
+float vtCCZ4ConnectionDerivative(
+    int point,
+    int axis,
+    int upper,
+    int first,
+    int second,
+    bool physical,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    ITensor<float, 2> state
+)
+{
+    if (vtCCZ4AxisCount(axis, nx, ny, nz) <= 1)
+        return 0.0;
+    int offsets[4] = { -2, -1, 1, 2 };
+    float weights[4] = { 1.0, -8.0, 8.0, -1.0 };
+    int samples = derivativeOrder == 4 ? 4 : 2;
+    float result = 0.0;
+    for (int sampleIndex = 0; sampleIndex < samples; ++sampleIndex)
+    {
+        int offset = derivativeOrder == 4
+            ? offsets[sampleIndex]
+            : (sampleIndex == 0 ? -1 : 1);
+        float weight = derivativeOrder == 4
+            ? weights[sampleIndex]
+            : (sampleIndex == 0 ? -1.0 : 1.0);
+        int sample = vtGridNeighbor(
+            point, axis, offset, nx, ny, nz
+        );
+        float metric[9] = {};
+        float inverseMetric[9] = {};
+        float connection[27] = {};
+        vtCCZ4Connection(
+            sample, physical, nx, ny, nz,
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state,
+            metric, inverseMetric, connection
+        );
+        result += weight * connection[
+            upper * 9 + first * 3 + second
+        ];
+    }
+    return result
+        * vtCCZ4InverseSpacing(
+            axis, inverseDx, inverseDy, inverseDz
+        )
+        / (derivativeOrder == 4 ? 12.0 : 2.0);
+}
+
 void vtCCZ4ZCovector(
     int point,
     int nx,
@@ -3387,6 +4987,7 @@ void vtCCZ4ZCovector(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     ITensor<float, 2> state,
     out float zDown[3]
 )
@@ -3396,7 +4997,7 @@ void vtCCZ4ZCovector(
     float connection[27] = {};
     vtCCZ4Connection(
         point, false, nx, ny, nz,
-        inverseDx, inverseDy, inverseDz, state,
+        inverseDx, inverseDy, inverseDz, derivativeOrder, state,
         metric, inverseMetric, connection
     );
     float contracted[3] = {};
@@ -3424,6 +5025,52 @@ void vtCCZ4ZCovector(
     }
 }
 
+float vtCCZ4ZDerivative(
+    int point,
+    int axis,
+    int component,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    ITensor<float, 2> state
+)
+{
+    if (vtCCZ4AxisCount(axis, nx, ny, nz) <= 1)
+        return 0.0;
+    int offsets[4] = { -2, -1, 1, 2 };
+    float weights[4] = { 1.0, -8.0, 8.0, -1.0 };
+    int samples = derivativeOrder == 4 ? 4 : 2;
+    float result = 0.0;
+    for (int sampleIndex = 0; sampleIndex < samples; ++sampleIndex)
+    {
+        int offset = derivativeOrder == 4
+            ? offsets[sampleIndex]
+            : (sampleIndex == 0 ? -1 : 1);
+        float weight = derivativeOrder == 4
+            ? weights[sampleIndex]
+            : (sampleIndex == 0 ? -1.0 : 1.0);
+        int sample = vtGridNeighbor(
+            point, axis, offset, nx, ny, nz
+        );
+        float zDown[3] = {};
+        vtCCZ4ZCovector(
+            sample, nx, ny, nz,
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state, zDown
+        );
+        result += weight * zDown[component];
+    }
+    return result
+        * vtCCZ4InverseSpacing(
+            axis, inverseDx, inverseDy, inverseDz
+        )
+        / (derivativeOrder == 4 ? 12.0 : 2.0);
+}
+
 void vtCCZ4Ricci(
     int point,
     int nx,
@@ -3432,6 +5079,7 @@ void vtCCZ4Ricci(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     ITensor<float, 2> state,
     out float ricci[9]
 )
@@ -3441,7 +5089,7 @@ void vtCCZ4Ricci(
     float connection[27] = {};
     vtCCZ4Connection(
         point, true, nx, ny, nz,
-        inverseDx, inverseDy, inverseDz, state,
+        inverseDx, inverseDy, inverseDz, derivativeOrder, state,
         metric, inverseMetric, connection
     );
     for (int first = 0; first < 3; ++first)
@@ -3453,77 +5101,23 @@ void vtCCZ4Ricci(
             {
                 if (vtCCZ4AxisCount(upper, nx, ny, nz) > 1)
                 {
-                    int plus = vtGridNeighbor(
-                        point, upper, 1, nx, ny, nz
+                    value += vtCCZ4ConnectionDerivative(
+                        point, upper,
+                        upper, first, second, true,
+                        nx, ny, nz,
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     );
-                    int minus = vtGridNeighbor(
-                        point, upper, -1, nx, ny, nz
-                    );
-                    float plusMetric[9] = {};
-                    float plusInverse[9] = {};
-                    float plusConnection[27] = {};
-                    float minusMetric[9] = {};
-                    float minusInverse[9] = {};
-                    float minusConnection[27] = {};
-                    vtCCZ4Connection(
-                        plus, true, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state,
-                        plusMetric, plusInverse, plusConnection
-                    );
-                    vtCCZ4Connection(
-                        minus, true, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state,
-                        minusMetric, minusInverse, minusConnection
-                    );
-                    value += 0.5
-                        * vtCCZ4InverseSpacing(
-                            upper, inverseDx, inverseDy, inverseDz
-                        )
-                        * (
-                            plusConnection[
-                                upper * 9 + first * 3 + second
-                            ]
-                            - minusConnection[
-                                upper * 9 + first * 3 + second
-                            ]
-                        );
                 }
                 if (vtCCZ4AxisCount(second, nx, ny, nz) > 1)
                 {
-                    int plus = vtGridNeighbor(
-                        point, second, 1, nx, ny, nz
+                    value -= vtCCZ4ConnectionDerivative(
+                        point, second,
+                        upper, first, upper, true,
+                        nx, ny, nz,
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     );
-                    int minus = vtGridNeighbor(
-                        point, second, -1, nx, ny, nz
-                    );
-                    float plusMetric[9] = {};
-                    float plusInverse[9] = {};
-                    float plusConnection[27] = {};
-                    float minusMetric[9] = {};
-                    float minusInverse[9] = {};
-                    float minusConnection[27] = {};
-                    vtCCZ4Connection(
-                        plus, true, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state,
-                        plusMetric, plusInverse, plusConnection
-                    );
-                    vtCCZ4Connection(
-                        minus, true, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state,
-                        minusMetric, minusInverse, minusConnection
-                    );
-                    value -= 0.5
-                        * vtCCZ4InverseSpacing(
-                            second, inverseDx, inverseDy, inverseDz
-                        )
-                        * (
-                            plusConnection[
-                                upper * 9 + first * 3 + upper
-                            ]
-                            - minusConnection[
-                                upper * 9 + first * 3 + upper
-                            ]
-                        );
                 }
                 for (int inner = 0; inner < 3; ++inner)
                 {
@@ -3564,6 +5158,7 @@ void ccz4VacuumRhsKernel(
     float inverseDx,
     float inverseDy,
     float inverseDz,
+    int derivativeOrder,
     float kappa1,
     float kappa2,
     float kappa3,
@@ -3581,7 +5176,7 @@ void ccz4VacuumRhsKernel(
     float gtConnection[27] = {};
     vtCCZ4Connection(
         point, false, nx, ny, nz,
-        inverseDx, inverseDy, inverseDz, state,
+        inverseDx, inverseDy, inverseDz, derivativeOrder, state,
         gt, gtInverse, gtConnection
     );
     float h[9] = {};
@@ -3589,18 +5184,20 @@ void ccz4VacuumRhsKernel(
     float hConnection[27] = {};
     vtCCZ4Connection(
         point, true, nx, ny, nz,
-        inverseDx, inverseDy, inverseDz, state,
+        inverseDx, inverseDy, inverseDz, derivativeOrder, state,
         h, hInverse, hConnection
     );
     float ricci[9] = {};
     vtCCZ4Ricci(
         point, nx, ny, nz,
-        inverseDx, inverseDy, inverseDz, state, ricci
+        inverseDx, inverseDy, inverseDz,
+        derivativeOrder, state, ricci
     );
     float zDown[3] = {};
     vtCCZ4ZCovector(
         point, nx, ny, nz,
-        inverseDx, inverseDy, inverseDz, state, zDown
+        inverseDx, inverseDy, inverseDz,
+        derivativeOrder, state, zDown
     );
     float phi = max(state[point, 18], 1.0e-8);
     float traceK = state[point, 19];
@@ -3613,7 +5210,8 @@ void ccz4VacuumRhsKernel(
         beta[axis] = state[point, 25 + axis];
         betaDivergence += vtCCZ4Derivative(
             point, 25 + axis, axis, nx, ny, nz,
-            inverseDx, inverseDy, inverseDz, state
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state
         );
     }
     float zUpPhysical[3] = {};
@@ -3649,27 +5247,12 @@ void ccz4VacuumRhsKernel(
             float derivativeZ = 0.0;
             if (vtCCZ4AxisCount(first, nx, ny, nz) > 1)
             {
-                int plus = vtGridNeighbor(
-                    point, first, 1, nx, ny, nz
+                derivativeZ = vtCCZ4ZDerivative(
+                    point, first, second,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
-                int minus = vtGridNeighbor(
-                    point, first, -1, nx, ny, nz
-                );
-                float plusZ[3] = {};
-                float minusZ[3] = {};
-                vtCCZ4ZCovector(
-                    plus, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state, plusZ
-                );
-                vtCCZ4ZCovector(
-                    minus, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state, minusZ
-                );
-                derivativeZ = 0.5
-                    * vtCCZ4InverseSpacing(
-                        first, inverseDx, inverseDy, inverseDz
-                    )
-                    * (plusZ[second] - minusZ[second]);
             }
             dz[first * 3 + second] = derivativeZ;
             for (int inner = 0; inner < 3; ++inner)
@@ -3681,7 +5264,8 @@ void ccz4VacuumRhsKernel(
             hessianAlpha[first * 3 + second] =
                 vtCCZ4SecondDerivative(
                     point, 24, first, second, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
             for (int inner = 0; inner < 3; ++inner)
             {
@@ -3689,7 +5273,8 @@ void ccz4VacuumRhsKernel(
                     hConnection[inner * 9 + first * 3 + second]
                     * vtCCZ4Derivative(
                         point, 24, inner, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     );
             }
             divZ +=
@@ -3770,38 +5355,44 @@ void ccz4VacuumRhsKernel(
                     * vtCCZ4Derivative(
                         point, first * 3 + second, axis,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     + gt[axis * 3 + first]
                     * vtCCZ4Derivative(
                         point, 25 + axis, second,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     + gt[axis * 3 + second]
                     * vtCCZ4Derivative(
                         point, 25 + axis, first,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     );
                 dA +=
                     beta[axis]
                     * vtCCZ4Derivative(
                         point, 9 + first * 3 + second, axis,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     + conformalA[axis * 3 + first]
                     * vtCCZ4Derivative(
                         point, 25 + axis, second,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     + conformalA[axis * 3 + second]
                     * vtCCZ4Derivative(
                         point, 25 + axis, first,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     );
             }
             dA += phi
@@ -3836,23 +5427,28 @@ void ccz4VacuumRhsKernel(
     {
         advPhi += beta[axis] * vtCCZ4Derivative(
             point, 18, axis, nx, ny, nz,
-            inverseDx, inverseDy, inverseDz, state
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state
         );
         advK += beta[axis] * vtCCZ4Derivative(
             point, 19, axis, nx, ny, nz,
-            inverseDx, inverseDy, inverseDz, state
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state
         );
         advTheta += beta[axis] * vtCCZ4Derivative(
             point, 20, axis, nx, ny, nz,
-            inverseDx, inverseDy, inverseDz, state
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state
         );
         advAlpha += beta[axis] * vtCCZ4Derivative(
             point, 24, axis, nx, ny, nz,
-            inverseDx, inverseDy, inverseDz, state
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state
         );
         zGradientAlpha += zUpPhysical[axis] * vtCCZ4Derivative(
             point, 24, axis, nx, ny, nz,
-            inverseDx, inverseDy, inverseDz, state
+            inverseDx, inverseDy, inverseDz,
+            derivativeOrder, state
         );
     }
     rhs[point, 18] =
@@ -3900,7 +5496,8 @@ void ccz4VacuumRhsKernel(
                 * aUp[upper * 3 + first]
                 * vtCCZ4Derivative(
                     point, 18, first, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 )
                 / phi;
             firstTerm -=
@@ -3908,7 +5505,8 @@ void ccz4VacuumRhsKernel(
                 * gtInverse[upper * 3 + first]
                 * vtCCZ4Derivative(
                     point, 19, first, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
         }
         float dGamma = 2.0 * alpha * firstTerm;
@@ -3921,12 +5519,14 @@ void ccz4VacuumRhsKernel(
                     alpha
                     * vtCCZ4Derivative(
                         point, 20, axis, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     - theta
                     * vtCCZ4Derivative(
                         point, 24, axis, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     - (2.0 / 3.0)
                     * alpha
@@ -3938,7 +5538,8 @@ void ccz4VacuumRhsKernel(
                 * aUp[upper * 3 + axis]
                 * vtCCZ4Derivative(
                     point, 24, axis, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
             for (int inner = 0; inner < 3; ++inner)
             {
@@ -3947,7 +5548,8 @@ void ccz4VacuumRhsKernel(
                     * vtCCZ4SecondDerivative(
                         point, 25 + upper, axis, inner,
                         nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     );
             }
             float gradientDivergence = 0.0;
@@ -3956,7 +5558,8 @@ void ccz4VacuumRhsKernel(
                 gradientDivergence += vtCCZ4SecondDerivative(
                     point, 25 + inner, axis, inner,
                     nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
             }
             dGamma +=
@@ -3967,13 +5570,15 @@ void ccz4VacuumRhsKernel(
                 contractedConformal[axis]
                 * vtCCZ4Derivative(
                     point, 25 + upper, axis, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
             dGamma +=
                 beta[axis]
                 * vtCCZ4Derivative(
                     point, 21 + upper, axis, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
             dGamma +=
                 2.0
@@ -3983,12 +5588,14 @@ void ccz4VacuumRhsKernel(
                     * zUpConformal[upper]
                     * vtCCZ4Derivative(
                         point, 25 + axis, axis, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                     - zUpConformal[axis]
                     * vtCCZ4Derivative(
                         point, 25 + upper, axis, nx, ny, nz,
-                        inverseDx, inverseDy, inverseDz, state
+                        inverseDx, inverseDy, inverseDz,
+                        derivativeOrder, state
                     )
                 );
         }
@@ -4017,15 +5624,18 @@ void ccz4VacuumRhsKernel(
             {
                 dShift += beta[inner] * vtCCZ4Derivative(
                     point, 25 + axis, inner, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
                 dDriver -= beta[inner] * vtCCZ4Derivative(
                     point, 21 + axis, inner, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
                 dDriver += beta[inner] * vtCCZ4Derivative(
                     point, 28 + axis, inner, nx, ny, nz,
-                    inverseDx, inverseDy, inverseDz, state
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder, state
                 );
             }
             rhs[point, 25 + axis] = dShift;
@@ -4077,6 +5687,69 @@ void theory33FullComposeCurvedKernel(
     state[point, 10] = material.conserved[0] * tracer[point];
 }
 
+void theory33CopyVectorStressKernel(
+    int point,
+    ITensor<float, 2> source,
+    IWTensor<float, 2> target
+)
+{
+    for (int component = 0; component < 15; ++component)
+        target[point, component] = source[point, component];
+}
+
+void theory33FullUpdateVectorStressKernel(
+    int point,
+    ITensor<float, 2> state,
+    ITensor<float, 2> geometryInput,
+    ITensor<float, 2> previousVectorStress,
+    ITensor<float, 2> currentVectorStress,
+    IWTensor<float, 2> output
+)
+{
+    float geometryValues[13] = {};
+    for (int component = 0; component < 13; ++component)
+        geometryValues[component] = geometryInput[point, component];
+    VTGeometry3 geometry = vtGeometry3(geometryValues);
+    for (int component = 0; component < 11; ++component)
+        output[point, component] = state[point, component];
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        output[point, 2 + axis] =
+            state[point, 2 + axis]
+            + geometry.sqrtDeterminant
+            * (
+                currentVectorStress[point, 1 + axis]
+                - previousVectorStress[point, 1 + axis]
+            );
+    }
+    output[point, 5] =
+        state[point, 5]
+        + geometry.sqrtDeterminant
+        * (
+            currentVectorStress[point, 0]
+            - previousVectorStress[point, 0]
+        );
+}
+
+void theory33FullConservativeDragCorrectKernel(
+    int point,
+    ITensor<float, 2> stateBefore,
+    IRWTensor<float, 2> stateAfter
+)
+{
+    // The local implicit drag map changes relative current and thermal
+    // entropy, but exactly preserves both densities, total momentum, total
+    // energy, and the advected tracer density. Re-impose those invariants
+    // after primitive recomposition so float32 recovery error cannot
+    // accumulate over long split horizons.
+    for (int component = 0; component < 6; ++component)
+        stateAfter[point, component] = stateBefore[point, component];
+    stateAfter[point, 9] = max(
+        stateAfter[point, 9], stateBefore[point, 9]
+    );
+    stateAfter[point, 10] = stateBefore[point, 10];
+}
+
 void theory33FullExtractTracerKernel(
     int point,
     ITensor<float, 2> state,
@@ -4087,9 +5760,30 @@ void theory33FullExtractTracerKernel(
         state[point, 10] / max(state[point, 0], VT_EPSILON);
 }
 
+void theory33FullLinearCorridorKernel(
+    int point,
+    ITensor<float, 2> inputState,
+    IWTensor<float, 2> outputState
+)
+{
+    int count = int(inputState.shape[0]);
+    float parameter = count > 1
+        ? float(point) / float(count - 1)
+        : 0.0;
+    for (int component = 0; component < 11; ++component)
+    {
+        outputState[point, component] =
+            (1.0 - parameter) * inputState[0, component]
+            + parameter * inputState[count - 1, component];
+    }
+}
+
 void theory33FullRecoverCurvedKernel(
     int point,
     int modelMode,
+    float recoveryTolerance,
+    float recoveryStep,
+    float phaseSwitchTolerance,
     ITensor<float, 2> state,
     ITensor<float, 2> geometryInput,
     ITensor<float, 2> vectorStress,
@@ -4143,8 +5837,8 @@ void theory33FullRecoverCurvedKernel(
     [MaxIters(3)]
     for (int transition = 0; transition < 3; ++transition)
     {
-        [MaxIters(28)]
-        for (int iteration = 0; iteration < 28; ++iteration)
+        [MaxIters(36)]
+        for (int iteration = 0; iteration < 36; ++iteration)
         {
             VTPrincipal9 prediction = vtPrincipal9(
                 working, geometry, 0, modelMode, phaseOverride
@@ -4157,13 +5851,13 @@ void theory33FullRecoverCurvedKernel(
                     (prediction.conserved[row] - target[row]) / scale[row];
                 finalNorm = max(finalNorm, abs(residual[row]));
             }
-            if (finalNorm < 3.0e-5)
+            if (finalNorm < recoveryTolerance)
                 break;
             float jacobian[81] = {};
             for (int column = 0; column < 9; ++column)
             {
                 float step =
-                    1.5e-3 * max(1.0, abs(working[column]));
+                    recoveryStep * max(1.0, abs(working[column]));
                 float plus[9] = {};
                 float minus[9] = {};
                 for (int index = 0; index < 9; ++index)
@@ -4238,7 +5932,12 @@ void theory33FullRecoverCurvedKernel(
         VTPrincipal9 recovered = vtPrincipal9(
             working, geometry, 0, modelMode, phaseOverride
         );
-        int finalPhase = recovered.switchingMargin >= 0.0 ? 1 : 0;
+        // A recovered primitive whose switching margin is inside the
+        // float32 nonlinear-solve uncertainty band is located on the
+        // event surface. Select the crossed branch just as the float64
+        // control does after resolving that event.
+        int finalPhase =
+            recovered.switchingMargin >= -phaseSwitchTolerance ? 1 : 0;
         if (modelMode != 1 || finalPhase == phaseOverride)
             break;
         phaseOverride = finalPhase;
@@ -4493,6 +6192,509 @@ void theory33FullInterfaceKernel(
     }
 }
 
+void theory33FullFaceEigensystemKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    int modelMode,
+    ITensor<float, 2> primitive,
+    ITensor<float, 2> geometryInput,
+    IWTensor<float, 2> rightBasis,
+    IWTensor<float, 2> leftBasis,
+    IWTensor<float, 2> eigenvalues,
+    IWTensor<float, 2> pathSymbol,
+    IWTensor<float, 2> entropyModes,
+    IWTensor<float, 1> transportSpeed,
+    IWTensor<float, 2> audit
+)
+{
+    int following = vtGridNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    float leftX[9] = {};
+    float rightX[9] = {};
+    float faceX[9] = {};
+    float leftGeometryValues[13] = {};
+    float rightGeometryValues[13] = {};
+    float faceGeometryValues[13] = {};
+    for (int index = 0; index < 9; ++index)
+    {
+        leftX[index] = primitive[point, index];
+        rightX[index] = primitive[following, index];
+        faceX[index] = 0.5 * (leftX[index] + rightX[index]);
+    }
+    for (int index = 0; index < 13; ++index)
+    {
+        leftGeometryValues[index] = geometryInput[point, index];
+        rightGeometryValues[index] = geometryInput[following, index];
+        faceGeometryValues[index] = 0.5 * (
+            leftGeometryValues[index] + rightGeometryValues[index]
+        );
+    }
+    VTGeometry3 leftGeometry = vtGeometry3(leftGeometryValues);
+    VTGeometry3 rightGeometry = vtGeometry3(rightGeometryValues);
+    VTGeometry3 faceGeometry = vtGeometry3(faceGeometryValues);
+    VTPrincipal9 leftPrediction = vtPrincipal9(
+        leftX, leftGeometry, axis, modelMode, -1
+    );
+    VTPrincipal9 rightPrediction = vtPrincipal9(
+        rightX, rightGeometry, axis, modelMode, -1
+    );
+    int leftPhase = modelMode == 1
+        ? (leftPrediction.phaseTwo ? 1 : 0)
+        : -1;
+    int rightPhase = modelMode == 1
+        ? (rightPrediction.phaseTwo ? 1 : 0)
+        : -1;
+    VTEigensystem9 leftSystem = vtCarterSymbol9(
+        leftX, leftGeometry, axis, modelMode, leftPhase
+    );
+    VTEigensystem9 rightSystem = vtCarterSymbol9(
+        rightX, rightGeometry, axis, modelMode, rightPhase
+    );
+    float averageSymbol[81] = {};
+    float selectedRight[81] = {};
+    for (int index = 0; index < 81; ++index)
+    {
+        averageSymbol[index] = 0.5 * (
+            leftSystem.symbol[index] + rightSystem.symbol[index]
+        );
+    }
+    VTEigensystem9 averageSystem = vtEigensystem9(averageSymbol);
+    float leftPath[81] = {};
+    float rightPath[81] = {};
+    vtCarterPathSymbol9(
+        leftX,
+        leftGeometry,
+        axis,
+        modelMode,
+        leftPhase,
+        leftPath
+    );
+    vtCarterPathSymbol9(
+        rightX,
+        rightGeometry,
+        axis,
+        modelMode,
+        rightPhase,
+        rightPath
+    );
+    for (int index = 0; index < 81; ++index)
+    {
+        pathSymbol[point, index] =
+            0.5 * (leftPath[index] + rightPath[index]);
+    }
+    bool phaseBoundary =
+        modelMode == 1 && leftPhase != rightPhase;
+    bool usePhysicalSide =
+        phaseBoundary
+        || averageSystem.conditionEstimate > 1.0e6
+        || !averageSystem.valid;
+    bool useLeft =
+        leftSystem.conditionEstimate <= rightSystem.conditionEstimate;
+    float selectedSymbol[81] = {};
+    for (int index = 0; index < 81; ++index)
+    {
+        selectedSymbol[index] = averageSymbol[index];
+        if (usePhysicalSide)
+        {
+            selectedSymbol[index] = useLeft
+                ? leftSystem.symbol[index]
+                : rightSystem.symbol[index];
+        }
+    }
+    VTEigensystem9 blockSystem = vtBlockEigensystem9(
+        selectedSymbol, axis
+    );
+    bool selectedValid = usePhysicalSide
+        ? (useLeft ? leftSystem.valid : rightSystem.valid)
+        : averageSystem.valid;
+    float selectedMaximumSpeed = usePhysicalSide
+        ? (
+            useLeft
+            ? leftSystem.maximumSpeed
+            : rightSystem.maximumSpeed
+        )
+        : averageSystem.maximumSpeed;
+    bool useBlock =
+        blockSystem.valid
+        && (
+            !selectedValid
+            || selectedMaximumSpeed > 1.0 + 2.0e-3
+        );
+
+    for (int index = 0; index < 81; ++index)
+    {
+        float rightValue = averageSystem.right[index];
+        float leftValue = averageSystem.left[index];
+        if (usePhysicalSide)
+        {
+            rightValue = useLeft
+                ? leftSystem.right[index]
+                : rightSystem.right[index];
+            leftValue = useLeft
+                ? leftSystem.left[index]
+                : rightSystem.left[index];
+        }
+        if (useBlock)
+        {
+            rightValue = blockSystem.right[index];
+            leftValue = blockSystem.left[index];
+        }
+        selectedRight[index] = rightValue;
+        rightBasis[point, index] = rightValue;
+        leftBasis[point, index] = leftValue;
+    }
+    float maximumSpeed = 0.0;
+    for (int mode = 0; mode < 9; ++mode)
+    {
+        float value = averageSystem.values[mode];
+        if (usePhysicalSide)
+        {
+            value = useLeft
+                ? leftSystem.values[mode]
+                : rightSystem.values[mode];
+        }
+        if (useBlock)
+            value = blockSystem.values[mode];
+        eigenvalues[point, mode] = value;
+        maximumSpeed = max(maximumSpeed, abs(value));
+    }
+    float residual = averageSystem.maximumResidual;
+    float inverseResidual = averageSystem.inverseResidual;
+    float condition = averageSystem.conditionEstimate;
+    bool valid = averageSystem.valid;
+    if (usePhysicalSide)
+    {
+        residual = useLeft
+            ? leftSystem.maximumResidual
+            : rightSystem.maximumResidual;
+        inverseResidual = useLeft
+            ? leftSystem.inverseResidual
+            : rightSystem.inverseResidual;
+        condition = useLeft
+            ? leftSystem.conditionEstimate
+            : rightSystem.conditionEstimate;
+        valid = useLeft ? leftSystem.valid : rightSystem.valid;
+    }
+    if (useBlock)
+    {
+        residual = blockSystem.maximumResidual;
+        inverseResidual = blockSystem.inverseResidual;
+        condition = blockSystem.conditionEstimate;
+        valid = blockSystem.valid;
+    }
+    audit[point, 0] = maximumSpeed;
+    audit[point, 1] = residual;
+    audit[point, 2] = inverseResidual;
+    audit[point, 3] = condition;
+    audit[point, 4] = valid ? 1.0 : 0.0;
+    audit[point, 5] = phaseBoundary ? 1.0 : 0.0;
+
+    float leftTime[81] = {};
+    float rightTime[81] = {};
+    float leftEntropyJacobian[9] = {};
+    float rightEntropyJacobian[9] = {};
+    for (int column = 0; column < 9; ++column)
+    {
+        float leftStep =
+            VT_CHARACTERISTIC_STEP9
+            * max(1.0, abs(leftX[column]));
+        float rightStep =
+            VT_CHARACTERISTIC_STEP9
+            * max(1.0, abs(rightX[column]));
+        float leftPlus[9] = {};
+        float leftMinus[9] = {};
+        float rightPlus[9] = {};
+        float rightMinus[9] = {};
+        for (int index = 0; index < 9; ++index)
+        {
+            leftPlus[index] = leftX[index];
+            leftMinus[index] = leftX[index];
+            rightPlus[index] = rightX[index];
+            rightMinus[index] = rightX[index];
+        }
+        leftPlus[column] += leftStep;
+        leftMinus[column] -= leftStep;
+        rightPlus[column] += rightStep;
+        rightMinus[column] -= rightStep;
+        VTPrincipal9 leftPlusPrediction = vtPrincipal9(
+            leftPlus, leftGeometry, axis, modelMode, leftPhase
+        );
+        VTPrincipal9 leftMinusPrediction = vtPrincipal9(
+            leftMinus, leftGeometry, axis, modelMode, leftPhase
+        );
+        VTPrincipal9 rightPlusPrediction = vtPrincipal9(
+            rightPlus, rightGeometry, axis, modelMode, rightPhase
+        );
+        VTPrincipal9 rightMinusPrediction = vtPrincipal9(
+            rightMinus, rightGeometry, axis, modelMode, rightPhase
+        );
+        float leftInverseStep = 1.0 / (2.0 * leftStep);
+        float rightInverseStep = 1.0 / (2.0 * rightStep);
+        for (int row = 0; row < 9; ++row)
+        {
+            leftTime[row * 9 + column] =
+                (
+                    leftPlusPrediction.conserved[row]
+                    - leftMinusPrediction.conserved[row]
+                )
+                * leftInverseStep;
+            rightTime[row * 9 + column] =
+                (
+                    rightPlusPrediction.conserved[row]
+                    - rightMinusPrediction.conserved[row]
+                )
+                * rightInverseStep;
+        }
+        leftEntropyJacobian[column] =
+            (
+                leftPlusPrediction.conserved[0]
+                * leftPlus[1]
+                - leftMinusPrediction.conserved[0]
+                * leftMinus[1]
+            )
+            * leftInverseStep;
+        rightEntropyJacobian[column] =
+            (
+                rightPlusPrediction.conserved[0]
+                * rightPlus[1]
+                - rightMinusPrediction.conserved[0]
+                * rightMinus[1]
+            )
+            * rightInverseStep;
+    }
+    float faceTime[81] = {};
+    for (int index = 0; index < 81; ++index)
+        faceTime[index] = 0.5 * (leftTime[index] + rightTime[index]);
+    float inverseFaceTime[81] = {};
+    bool faceTimeValid = vtInvert9(faceTime, inverseFaceTime);
+    for (int mode = 0; mode < 9; ++mode)
+    {
+        float entropyMode = 0.0;
+        for (int primitiveRow = 0; primitiveRow < 9; ++primitiveRow)
+        {
+            float primitiveMode = 0.0;
+            for (int physicalRow = 0; physicalRow < 9; ++physicalRow)
+            {
+                primitiveMode +=
+                    inverseFaceTime[
+                        primitiveRow * 9 + physicalRow
+                    ]
+                    * selectedRight[physicalRow * 9 + mode];
+            }
+            entropyMode +=
+                0.5
+                * (
+                    leftEntropyJacobian[primitiveRow]
+                    + rightEntropyJacobian[primitiveRow]
+                )
+                * primitiveMode;
+        }
+        entropyModes[point, mode] =
+            faceTimeValid ? entropyMode : 0.0;
+    }
+    float leftQN[3] = {};
+    float rightQN[3] = {};
+    for (int spatial = 0; spatial < 3; ++spatial)
+    {
+        leftQN[spatial] = leftX[2 + spatial];
+        rightQN[spatial] = rightX[2 + spatial];
+    }
+    float leftWN = sqrt(
+        max(
+            1.0 + vtMetricDot3(
+                leftQN, leftGeometry.metric, leftQN
+            ),
+            1.0
+        )
+    );
+    float rightWN = sqrt(
+        max(
+            1.0 + vtMetricDot3(
+                rightQN, rightGeometry.metric, rightQN
+            ),
+            1.0
+        )
+    );
+    transportSpeed[point] = 0.5 * (
+        leftGeometry.lapse * leftQN[axis] / leftWN
+        - leftGeometry.shift[axis]
+        + rightGeometry.lapse * rightQN[axis] / rightWN
+        - rightGeometry.shift[axis]
+    );
+}
+
+void theory33FullRoeInterfaceKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    ITensor<float, 2> state,
+    ITensor<float, 2> flux,
+    ITensor<float, 1> speed,
+    ITensor<float, 2> rightBasis,
+    ITensor<float, 2> leftBasis,
+    ITensor<float, 2> eigenvalues,
+    ITensor<float, 2> entropyModes,
+    ITensor<float, 1> transportSpeed,
+    IRWTensor<float, 2> interfaceFlux
+)
+{
+    int following = vtGridNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    // The full production CPU bound is the coordinate light speed. The
+    // robust resident Rusanov baseline stores 1.35 times that value.
+    float faceSpeed =
+        max(speed[point], speed[following]) / 1.35;
+    float characteristicJump[9] = {};
+    for (int mode = 0; mode < 9; ++mode)
+    {
+        for (int component = 0; component < 9; ++component)
+        {
+            characteristicJump[mode] +=
+                leftBasis[point, mode * 9 + component]
+                * (
+                    state[following, component]
+                    - state[point, component]
+                );
+        }
+    }
+    for (int component = 0; component < 9; ++component)
+    {
+        float dissipation = 0.0;
+        for (int mode = 0; mode < 9; ++mode)
+        {
+            float rate =
+                0.5 * abs(eigenvalues[point, mode])
+                + 0.5 * faceSpeed;
+            dissipation +=
+                rightBasis[point, component * 9 + mode]
+                * rate
+                * characteristicJump[mode];
+        }
+        interfaceFlux[point, component] =
+            0.5 * (
+                flux[point, component]
+                + flux[following, component]
+            )
+            - 0.5 * dissipation;
+    }
+    float passiveRate =
+        0.5 * abs(transportSpeed[point]) + 0.5 * faceSpeed;
+    float entropyPhysicalJump = 0.0;
+    float entropyPhysicalDissipation = 0.0;
+    float tracerPhysicalJump = 0.0;
+    float tracerPhysicalDissipation = 0.0;
+    float leftTracer =
+        state[point, 10] / max(abs(state[point, 0]), VT_EPSILON);
+    float rightTracer =
+        state[following, 10]
+        / max(abs(state[following, 0]), VT_EPSILON);
+    float faceTracer = 0.5 * (leftTracer + rightTracer);
+    for (int mode = 0; mode < 9; ++mode)
+    {
+        float physicalRate =
+            0.5 * abs(eigenvalues[point, mode])
+            + 0.5 * faceSpeed;
+        float entropyMode = entropyModes[point, mode];
+        float tracerMode =
+            faceTracer * rightBasis[point, mode];
+        entropyPhysicalJump +=
+            entropyMode * characteristicJump[mode];
+        entropyPhysicalDissipation +=
+            entropyMode * physicalRate * characteristicJump[mode];
+        tracerPhysicalJump +=
+            tracerMode * characteristicJump[mode];
+        tracerPhysicalDissipation +=
+            tracerMode * physicalRate * characteristicJump[mode];
+    }
+    float entropyPassive =
+        state[following, 9]
+        - state[point, 9]
+        - entropyPhysicalJump;
+    float tracerPassive =
+        state[following, 10]
+        - state[point, 10]
+        - tracerPhysicalJump;
+    interfaceFlux[point, 9] =
+        0.5 * (flux[point, 9] + flux[following, 9])
+        - 0.5
+        * (
+            entropyPhysicalDissipation
+            + passiveRate * entropyPassive
+        );
+    interfaceFlux[point, 10] =
+        0.5 * (flux[point, 10] + flux[following, 10])
+        - 0.5
+        * (
+            tracerPhysicalDissipation
+            + passiveRate * tracerPassive
+        );
+}
+
+void theory33FullRoeDirectionalRhsKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseSpacing,
+    ITensor<float, 2> state,
+    ITensor<float, 2> interfaceFlux,
+    ITensor<float, 2> pathSymbol,
+    IWTensor<float, 2> rhs
+)
+{
+    int previous = vtGridNeighbor(
+        point, axis, -1, nx, ny, nz
+    );
+    int following = vtGridNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    float rightPathJump[9] = {};
+    float leftPathJump[9] = {};
+    for (int row = 0; row < 9; ++row)
+    {
+        for (int column = 0; column < 9; ++column)
+        {
+            rightPathJump[row] +=
+                pathSymbol[point, row * 9 + column]
+                * (
+                    state[following, column]
+                    - state[point, column]
+                );
+            leftPathJump[row] +=
+                pathSymbol[previous, row * 9 + column]
+                * (
+                    state[point, column]
+                    - state[previous, column]
+                );
+        }
+    }
+    for (int component = 0; component < 11; ++component)
+    {
+        float pathFluctuation = component < 9
+            ? 0.5
+            * (
+                rightPathJump[component]
+                + leftPathJump[component]
+            )
+            : 0.0;
+        rhs[point, component] =
+            -(
+                interfaceFlux[point, component]
+                - interfaceFlux[previous, component]
+            )
+            * inverseSpacing
+            - pathFluctuation * inverseSpacing;
+    }
+}
+
 void theory33FullDirectionalRhsKernel(
     int point,
     int axis,
@@ -4570,6 +6772,1360 @@ void theory33FullZeroRhsKernel(
         rhs[point, component] = 0.0;
 }
 
+// -------------------------------------------------------------------------
+// Conservative block-structured AMR primitives.
+
+int vtAMRLinearIndex(
+    int x,
+    int y,
+    int z,
+    int nx,
+    int ny
+)
+{
+    return x + nx * (y + ny * z);
+}
+
+float vtAMRMinmod(float left, float right)
+{
+    if (left * right <= 0.0)
+        return 0.0;
+    return abs(left) < abs(right) ? left : right;
+}
+
+void theory33AMRProlongKernel(
+    int point,
+    int coarseNx,
+    int coarseNy,
+    int coarseNz,
+    int fineNx,
+    int fineNy,
+    int fineNz,
+    int componentCount,
+    ITensor<float, 2> coarse,
+    IWTensor<float, 2> fine
+)
+{
+    int fineCoordinates[3] = {
+        point % fineNx,
+        (point / fineNx) % fineNy,
+        point / (fineNx * fineNy)
+    };
+    int coarseCounts[3] = {
+        coarseNx, coarseNy, coarseNz
+    };
+    int parentCoordinates[3] = {
+        fineCoordinates[0] / 2,
+        fineCoordinates[1] / 2,
+        fineCoordinates[2] / 2
+    };
+    int parent = vtAMRLinearIndex(
+        parentCoordinates[0],
+        parentCoordinates[1],
+        parentCoordinates[2],
+        coarseNx,
+        coarseNy
+    );
+    for (int component = 0; component < componentCount; ++component)
+    {
+        float value = coarse[parent, component];
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (coarseCounts[axis] <= 1)
+                continue;
+            int leftCoordinates[3] = {
+                parentCoordinates[0],
+                parentCoordinates[1],
+                parentCoordinates[2]
+            };
+            int rightCoordinates[3] = {
+                parentCoordinates[0],
+                parentCoordinates[1],
+                parentCoordinates[2]
+            };
+            leftCoordinates[axis] = max(
+                parentCoordinates[axis] - 1, 0
+            );
+            rightCoordinates[axis] = min(
+                parentCoordinates[axis] + 1,
+                coarseCounts[axis] - 1
+            );
+            int left = vtAMRLinearIndex(
+                leftCoordinates[0],
+                leftCoordinates[1],
+                leftCoordinates[2],
+                coarseNx,
+                coarseNy
+            );
+            int right = vtAMRLinearIndex(
+                rightCoordinates[0],
+                rightCoordinates[1],
+                rightCoordinates[2],
+                coarseNx,
+                coarseNy
+            );
+            float slope = vtAMRMinmod(
+                coarse[parent, component] - coarse[left, component],
+                coarse[right, component] - coarse[parent, component]
+            );
+            float childSign =
+                fineCoordinates[axis] % 2 == 0 ? -1.0 : 1.0;
+            value += 0.25 * childSign * slope;
+        }
+        fine[point, component] = value;
+    }
+}
+
+void theory33AMRRestrictKernel(
+    int point,
+    int coarseNx,
+    int coarseNy,
+    int coarseNz,
+    int fineNx,
+    int fineNy,
+    int fineNz,
+    int componentCount,
+    ITensor<float, 2> fine,
+    IWTensor<float, 2> coarse
+)
+{
+    int coarseCoordinates[3] = {
+        point % coarseNx,
+        (point / coarseNx) % coarseNy,
+        point / (coarseNx * coarseNy)
+    };
+    int activeDimensions =
+        (coarseNx > 1 ? 1 : 0)
+        + (coarseNy > 1 ? 1 : 0)
+        + (coarseNz > 1 ? 1 : 0);
+    int children = 1 << activeDimensions;
+    for (int component = 0; component < componentCount; ++component)
+    {
+        float sum = 0.0;
+        for (int child = 0; child < children; ++child)
+        {
+            int bit = 0;
+            int fineCoordinates[3] = {};
+            int coarseCounts[3] = {
+                coarseNx, coarseNy, coarseNz
+            };
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                int childOffset = 0;
+                if (coarseCounts[axis] > 1)
+                {
+                    childOffset = (child >> bit) & 1;
+                    bit += 1;
+                }
+                fineCoordinates[axis] =
+                    2 * coarseCoordinates[axis] + childOffset;
+            }
+            int finePoint = vtAMRLinearIndex(
+                fineCoordinates[0],
+                fineCoordinates[1],
+                fineCoordinates[2],
+                fineNx,
+                fineNy
+            );
+            sum += fine[finePoint, component];
+        }
+        coarse[point, component] = sum / float(children);
+    }
+}
+
+void theory33AMRGaussProjectKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float ZA,
+    float ZB,
+    ITensor<float, 2> piA,
+    ITensor<float, 2> piB,
+    IWTensor<float, 2> longitudinal
+)
+{
+    float divergenceA = 0.0;
+    float divergenceB = 0.0;
+    int counts[3] = { nx, ny, nz };
+    float inverseSpacing[3] = {
+        inverseDx, inverseDy, inverseDz
+    };
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (counts[axis] <= 1)
+            continue;
+        int plus = vtGridNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int minus = vtGridNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        divergenceA +=
+            0.5
+            * inverseSpacing[axis]
+            * (piA[plus, axis] - piA[minus, axis])
+            / ZA;
+        divergenceB +=
+            0.5
+            * inverseSpacing[axis]
+            * (piB[plus, axis] - piB[minus, axis])
+            / ZB;
+    }
+    longitudinal[point, 0] = divergenceA;
+    longitudinal[point, 1] = divergenceB;
+}
+
+void theory33AMRFluxRegister1DKernel(
+    int point,
+    int componentCount,
+    int lower,
+    int upper,
+    float dtOverDx,
+    ITensor<float, 1> coarseLowerFlux,
+    ITensor<float, 1> fineLowerFlux,
+    ITensor<float, 1> coarseUpperFlux,
+    ITensor<float, 1> fineUpperFlux,
+    IWTensor<float, 2> correction
+)
+{
+    for (int component = 0; component < componentCount; ++component)
+    {
+        float value = 0.0;
+        if (point == lower - 1 && lower > 0)
+        {
+            value -= dtOverDx
+                * (
+                    fineLowerFlux[component]
+                    - coarseLowerFlux[component]
+                );
+        }
+        if (point == upper)
+        {
+            value += dtOverDx
+                * (
+                    fineUpperFlux[component]
+                    - coarseUpperFlux[component]
+                );
+        }
+        correction[point, component] = value;
+    }
+}
+
+void theory33AMRRefluxKernel(
+    int point,
+    int componentCount,
+    ITensor<float, 2> coarse,
+    ITensor<float, 2> correction,
+    IWTensor<float, 2> output
+)
+{
+    for (int component = 0; component < componentCount; ++component)
+    {
+        output[point, component] =
+            coarse[point, component] + correction[point, component];
+    }
+}
+
+// -------------------------------------------------------------------------
+// Nonperiodic physical outer-boundary operators.
+
+#if 1
+
+int vtBoundaryCoordinate(
+    int point,
+    int axis,
+    int nx,
+    int ny
+)
+{
+    return axis == 0
+        ? point % nx
+        : (
+            axis == 1
+            ? (point / nx) % ny
+            : point / (nx * ny)
+        );
+}
+
+int vtBoundaryCount(int axis, int nx, int ny, int nz)
+{
+    return axis == 0 ? nx : (axis == 1 ? ny : nz);
+}
+
+int vtBoundaryClampedNeighbor(
+    int point,
+    int axis,
+    int offset,
+    int nx,
+    int ny,
+    int nz
+)
+{
+    int x = point % nx;
+    int y = (point / nx) % ny;
+    int z = point / (nx * ny);
+    if (axis == 0)
+        x = min(max(x + offset, 0), nx - 1);
+    else if (axis == 1)
+        y = min(max(y + offset, 0), ny - 1);
+    else
+        z = min(max(z + offset, 0), nz - 1);
+    return x + nx * (y + ny * z);
+}
+
+bool vtBoundaryPoint(
+    int point,
+    int nx,
+    int ny,
+    int nz
+)
+{
+    int counts[3] = { nx, ny, nz };
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (counts[axis] <= 1)
+            continue;
+        int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+        if (coordinate == 0 || coordinate == counts[axis] - 1)
+            return true;
+    }
+    return false;
+}
+
+float vtBoundaryInverseSpacing(
+    int axis,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz
+)
+{
+    return axis == 0
+        ? inverseDx
+        : (axis == 1 ? inverseDy : inverseDz);
+}
+
+float vtBoundaryDerivative(
+    int point,
+    int component,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    ITensor<float, 2> field
+)
+{
+    int count = vtBoundaryCount(axis, nx, ny, nz);
+    if (count <= 1)
+        return 0.0;
+    int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+    float inverse = vtBoundaryInverseSpacing(
+        axis, inverseDx, inverseDy, inverseDz
+    );
+    if (derivativeOrder == 4 && count >= 5)
+    {
+        int zero = vtBoundaryClampedNeighbor(
+            point, axis, -coordinate, nx, ny, nz
+        );
+        int one = vtBoundaryClampedNeighbor(
+            zero, axis, 1, nx, ny, nz
+        );
+        int two = vtBoundaryClampedNeighbor(
+            zero, axis, 2, nx, ny, nz
+        );
+        int three = vtBoundaryClampedNeighbor(
+            zero, axis, 3, nx, ny, nz
+        );
+        int four = vtBoundaryClampedNeighbor(
+            zero, axis, 4, nx, ny, nz
+        );
+        if (coordinate == 0)
+        {
+            return (inverse / 12.0) * (
+                -25.0 * field[zero, component]
+                + 48.0 * field[one, component]
+                - 36.0 * field[two, component]
+                + 16.0 * field[three, component]
+                - 3.0 * field[four, component]
+            );
+        }
+        if (coordinate == 1)
+        {
+            return (inverse / 12.0) * (
+                -3.0 * field[zero, component]
+                - 10.0 * field[one, component]
+                + 18.0 * field[two, component]
+                - 6.0 * field[three, component]
+                + field[four, component]
+            );
+        }
+        if (coordinate == count - 1)
+        {
+            int last = vtBoundaryClampedNeighbor(
+                point, axis, 0, nx, ny, nz
+            );
+            int backOne = vtBoundaryClampedNeighbor(
+                point, axis, -1, nx, ny, nz
+            );
+            int backTwo = vtBoundaryClampedNeighbor(
+                point, axis, -2, nx, ny, nz
+            );
+            int backThree = vtBoundaryClampedNeighbor(
+                point, axis, -3, nx, ny, nz
+            );
+            int backFour = vtBoundaryClampedNeighbor(
+                point, axis, -4, nx, ny, nz
+            );
+            return -(inverse / 12.0) * (
+                -25.0 * field[last, component]
+                + 48.0 * field[backOne, component]
+                - 36.0 * field[backTwo, component]
+                + 16.0 * field[backThree, component]
+                - 3.0 * field[backFour, component]
+            );
+        }
+        if (coordinate == count - 2)
+        {
+            int last = vtBoundaryClampedNeighbor(
+                point, axis, 1, nx, ny, nz
+            );
+            int backOne = point;
+            int backTwo = vtBoundaryClampedNeighbor(
+                point, axis, -1, nx, ny, nz
+            );
+            int backThree = vtBoundaryClampedNeighbor(
+                point, axis, -2, nx, ny, nz
+            );
+            int backFour = vtBoundaryClampedNeighbor(
+                point, axis, -3, nx, ny, nz
+            );
+            return -(inverse / 12.0) * (
+                -3.0 * field[last, component]
+                - 10.0 * field[backOne, component]
+                + 18.0 * field[backTwo, component]
+                - 6.0 * field[backThree, component]
+                + field[backFour, component]
+            );
+        }
+        int plusOne = vtBoundaryClampedNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int plusTwo = vtBoundaryClampedNeighbor(
+            point, axis, 2, nx, ny, nz
+        );
+        int minusOne = vtBoundaryClampedNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        int minusTwo = vtBoundaryClampedNeighbor(
+            point, axis, -2, nx, ny, nz
+        );
+        return (inverse / 12.0) * (
+            -field[plusTwo, component]
+            + 8.0 * field[plusOne, component]
+            - 8.0 * field[minusOne, component]
+            + field[minusTwo, component]
+        );
+    }
+    if (coordinate == 0 && count >= 3)
+    {
+        int one = vtBoundaryClampedNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int two = vtBoundaryClampedNeighbor(
+            point, axis, 2, nx, ny, nz
+        );
+        return 0.5 * inverse * (
+            -3.0 * field[point, component]
+            + 4.0 * field[one, component]
+            - field[two, component]
+        );
+    }
+    if (coordinate == count - 1 && count >= 3)
+    {
+        int one = vtBoundaryClampedNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        int two = vtBoundaryClampedNeighbor(
+            point, axis, -2, nx, ny, nz
+        );
+        return 0.5 * inverse * (
+            3.0 * field[point, component]
+            - 4.0 * field[one, component]
+            + field[two, component]
+        );
+    }
+    int plus = vtBoundaryClampedNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    int minus = vtBoundaryClampedNeighbor(
+        point, axis, -1, nx, ny, nz
+    );
+    return 0.5 * inverse * (
+        field[plus, component] - field[minus, component]
+    );
+}
+
+void vtBoundaryRadiusNormal(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float dx,
+    float dy,
+    float dz,
+    float originX,
+    float originY,
+    float originZ,
+    out float radius,
+    out float normal[3]
+)
+{
+    int coordinates[3] = {
+        point % nx,
+        (point / nx) % ny,
+        point / (nx * ny)
+    };
+    int counts[3] = { nx, ny, nz };
+    float spacing[3] = { dx, dy, dz };
+    float origins[3] = { originX, originY, originZ };
+    float radiusSquared = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (counts[axis] <= 1)
+        {
+            normal[axis] = 0.0;
+            continue;
+        }
+        float displacement =
+            origins[axis]
+            + (float(coordinates[axis]) + 0.5) * spacing[axis];
+        normal[axis] = displacement;
+        radiusSquared += displacement * displacement;
+    }
+    radius = sqrt(max(radiusSquared, 1.0e-30));
+    for (int axis = 0; axis < 3; ++axis)
+        normal[axis] /= radius;
+}
+
+float vtBoundaryMetricInverseValue(
+    int point,
+    int row,
+    int column,
+    ITensor<float, 2> state
+)
+{
+    float values[13] = {};
+    for (int component = 0; component < 9; ++component)
+        values[component] = state[point, component];
+    values[9] = 1.0;
+    VTGeometry3 geometry = vtGeometry3(values);
+    return geometry.inverseMetric[3 * row + column];
+}
+
+float vtBoundaryMetricInverseDerivative(
+    int point,
+    int row,
+    int column,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    ITensor<float, 2> state
+)
+{
+    int count = vtBoundaryCount(axis, nx, ny, nz);
+    if (count <= 1)
+        return 0.0;
+    int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+    float inverse = vtBoundaryInverseSpacing(
+        axis, inverseDx, inverseDy, inverseDz
+    );
+    if (derivativeOrder == 4 && count >= 5)
+    {
+        int zero = vtBoundaryClampedNeighbor(
+            point, axis, -coordinate, nx, ny, nz
+        );
+        int samples[5] = {
+            zero,
+            vtBoundaryClampedNeighbor(zero, axis, 1, nx, ny, nz),
+            vtBoundaryClampedNeighbor(zero, axis, 2, nx, ny, nz),
+            vtBoundaryClampedNeighbor(zero, axis, 3, nx, ny, nz),
+            vtBoundaryClampedNeighbor(zero, axis, 4, nx, ny, nz)
+        };
+        if (coordinate == 0 || coordinate == 1)
+        {
+            float weights[5] = {};
+            if (coordinate == 0)
+            {
+                weights[0] = -25.0;
+                weights[1] = 48.0;
+                weights[2] = -36.0;
+                weights[3] = 16.0;
+                weights[4] = -3.0;
+            }
+            else
+            {
+                weights[0] = -3.0;
+                weights[1] = -10.0;
+                weights[2] = 18.0;
+                weights[3] = -6.0;
+                weights[4] = 1.0;
+            }
+            float result = 0.0;
+            for (int sample = 0; sample < 5; ++sample)
+            {
+                result += weights[sample]
+                    * vtBoundaryMetricInverseValue(
+                        samples[sample], row, column, state
+                    );
+            }
+            return inverse * result / 12.0;
+        }
+        if (coordinate == count - 1 || coordinate == count - 2)
+        {
+            int startOffset = coordinate == count - 1 ? 0 : 1;
+            int reverseSamples[5] = {
+                vtBoundaryClampedNeighbor(
+                    point, axis, startOffset, nx, ny, nz
+                ),
+                vtBoundaryClampedNeighbor(
+                    point, axis, startOffset - 1, nx, ny, nz
+                ),
+                vtBoundaryClampedNeighbor(
+                    point, axis, startOffset - 2, nx, ny, nz
+                ),
+                vtBoundaryClampedNeighbor(
+                    point, axis, startOffset - 3, nx, ny, nz
+                ),
+                vtBoundaryClampedNeighbor(
+                    point, axis, startOffset - 4, nx, ny, nz
+                )
+            };
+            float weights[5] = {};
+            if (coordinate == count - 1)
+            {
+                weights[0] = -25.0;
+                weights[1] = 48.0;
+                weights[2] = -36.0;
+                weights[3] = 16.0;
+                weights[4] = -3.0;
+            }
+            else
+            {
+                weights[0] = -3.0;
+                weights[1] = -10.0;
+                weights[2] = 18.0;
+                weights[3] = -6.0;
+                weights[4] = 1.0;
+            }
+            float result = 0.0;
+            for (int sample = 0; sample < 5; ++sample)
+            {
+                result += weights[sample]
+                    * vtBoundaryMetricInverseValue(
+                        reverseSamples[sample], row, column, state
+                    );
+            }
+            return -inverse * result / 12.0;
+        }
+        int plusOne = vtBoundaryClampedNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int plusTwo = vtBoundaryClampedNeighbor(
+            point, axis, 2, nx, ny, nz
+        );
+        int minusOne = vtBoundaryClampedNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        int minusTwo = vtBoundaryClampedNeighbor(
+            point, axis, -2, nx, ny, nz
+        );
+        return (inverse / 12.0) * (
+            -vtBoundaryMetricInverseValue(
+                plusTwo, row, column, state
+            )
+            + 8.0 * vtBoundaryMetricInverseValue(
+                plusOne, row, column, state
+            )
+            - 8.0 * vtBoundaryMetricInverseValue(
+                minusOne, row, column, state
+            )
+            + vtBoundaryMetricInverseValue(
+                minusTwo, row, column, state
+            )
+        );
+    }
+    if (coordinate == 0 && count >= 3)
+    {
+        int one = vtBoundaryClampedNeighbor(
+            point, axis, 1, nx, ny, nz
+        );
+        int two = vtBoundaryClampedNeighbor(
+            point, axis, 2, nx, ny, nz
+        );
+        return 0.5 * inverse * (
+            -3.0 * vtBoundaryMetricInverseValue(
+                point, row, column, state
+            )
+            + 4.0 * vtBoundaryMetricInverseValue(
+                one, row, column, state
+            )
+            - vtBoundaryMetricInverseValue(
+                two, row, column, state
+            )
+        );
+    }
+    if (coordinate == count - 1 && count >= 3)
+    {
+        int one = vtBoundaryClampedNeighbor(
+            point, axis, -1, nx, ny, nz
+        );
+        int two = vtBoundaryClampedNeighbor(
+            point, axis, -2, nx, ny, nz
+        );
+        return 0.5 * inverse * (
+            3.0 * vtBoundaryMetricInverseValue(
+                point, row, column, state
+            )
+            - 4.0 * vtBoundaryMetricInverseValue(
+                one, row, column, state
+            )
+            + vtBoundaryMetricInverseValue(
+                two, row, column, state
+            )
+        );
+    }
+    int plus = vtBoundaryClampedNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    int minus = vtBoundaryClampedNeighbor(
+        point, axis, -1, nx, ny, nz
+    );
+    return 0.5 * inverse * (
+        vtBoundaryMetricInverseValue(
+            plus, row, column, state
+        )
+        - vtBoundaryMetricInverseValue(
+            minus, row, column, state
+        )
+    );
+}
+
+#endif
+
+#if 1
+
+void theory33CCZ4GammaHatFromMetricKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    ITensor<float, 2> state,
+    IWTensor<float, 2> output
+)
+{
+    for (int component = 0; component < 31; ++component)
+        output[point, component] = state[point, component];
+    for (int upper = 0; upper < 3; ++upper)
+    {
+        float contracted = 0.0;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            contracted -= vtBoundaryMetricInverseDerivative(
+                point, upper, axis, axis,
+                nx, ny, nz,
+                inverseDx, inverseDy, inverseDz,
+                derivativeOrder,
+                state
+            );
+        }
+        output[point, 21 + upper] = contracted;
+    }
+}
+
+void theory33CCZ4RadiativeBoundaryKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float originX,
+    float originY,
+    float originZ,
+    int derivativeOrder,
+    float constraintDamping,
+    ITensor<float, 2> state,
+    IRWTensor<float, 2> rhs
+)
+{
+    if (!vtBoundaryPoint(point, nx, ny, nz))
+        return;
+    float radius;
+    float normal[3] = {};
+    vtBoundaryRadiusNormal(
+        point, nx, ny, nz,
+        1.0 / inverseDx,
+        1.0 / inverseDy,
+        1.0 / inverseDz,
+        originX, originY, originZ,
+        radius, normal
+    );
+    for (int component = 0; component < 31; ++component)
+    {
+        float radialDerivative = 0.0;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            radialDerivative +=
+                normal[axis]
+                * vtBoundaryDerivative(
+                    point, component, axis,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder,
+                    state
+                );
+        }
+        float asymptotic =
+            (
+                component == 0
+                || component == 4
+                || component == 8
+                || component == 18
+                || component == 24
+            )
+            ? 1.0
+            : 0.0;
+        float speed = component == 24 ? sqrt(2.0) : 1.0;
+        rhs[point, component] = -speed * (
+            radialDerivative
+            + (state[point, component] - asymptotic) / radius
+        );
+    }
+
+    float values[13] = {};
+    for (int component = 0; component < 9; ++component)
+        values[component] = state[point, component];
+    values[9] = 1.0;
+    VTGeometry3 geometry = vtGeometry3(values);
+    float contracted[3] = {};
+    for (int upper = 0; upper < 3; ++upper)
+    {
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            contracted[upper] -= vtBoundaryMetricInverseDerivative(
+                point, upper, axis, axis,
+                nx, ny, nz,
+                inverseDx, inverseDy, inverseDz,
+                derivativeOrder,
+                state
+            );
+        }
+    }
+    float zDown[3] = {};
+    for (int row = 0; row < 3; ++row)
+    {
+        for (int column = 0; column < 3; ++column)
+        {
+            zDown[row] += 0.5
+                * geometry.metric[3 * row + column]
+                * (
+                    state[point, 21 + column]
+                    - contracted[column]
+                );
+        }
+    }
+    float zNormal = 0.0;
+    float dZNormal = 0.0;
+    for (int row = 0; row < 3; ++row)
+    {
+        zNormal += normal[row] * zDown[row];
+        for (int column = 0; column < 3; ++column)
+        {
+            dZNormal += 0.5
+                * normal[row]
+                * geometry.metric[3 * row + column]
+                * rhs[point, 21 + column];
+        }
+    }
+    float outgoingRhs = rhs[point, 20] - dZNormal;
+    float incomingRhs = -constraintDamping
+        * (state[point, 20] + zNormal);
+    float targetThetaRhs = 0.5 * (outgoingRhs + incomingRhs);
+    float targetDZNormal = 0.5 * (incomingRhs - outgoingRhs);
+    float delta = targetDZNormal - dZNormal;
+    rhs[point, 20] = targetThetaRhs;
+    for (int upper = 0; upper < 3; ++upper)
+    {
+        float correction = 0.0;
+        for (int row = 0; row < 3; ++row)
+        {
+            correction +=
+                2.0
+                * geometry.inverseMetric[3 * upper + row]
+                * normal[row]
+                * delta;
+        }
+        rhs[point, 21 + upper] += correction;
+    }
+}
+
+#endif
+
+#if 1
+
+void theory33VectorRadiativeBoundaryKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    float originX,
+    float originY,
+    float originZ,
+    int derivativeOrder,
+    ITensor<float, 2> state,
+    ITensor<float, 2> rawRhs,
+    IWTensor<float, 2> projectedRhs
+)
+{
+    for (int component = 0; component < 16; ++component)
+        projectedRhs[point, component] = rawRhs[point, component];
+    if (!vtBoundaryPoint(point, nx, ny, nz))
+        return;
+    float radius;
+    float normal[3] = {};
+    vtBoundaryRadiusNormal(
+        point, nx, ny, nz,
+        1.0 / inverseDx,
+        1.0 / inverseDy,
+        1.0 / inverseDz,
+        originX, originY, originZ,
+        radius, normal
+    );
+    for (int component = 0; component < 16; ++component)
+    {
+        if (component == 12 || component == 13)
+            continue;
+        float radialDerivative = 0.0;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            radialDerivative +=
+                normal[axis]
+                * vtBoundaryDerivative(
+                    point, component, axis,
+                    nx, ny, nz,
+                    inverseDx, inverseDy, inverseDz,
+                    derivativeOrder,
+                    state
+                );
+        }
+        projectedRhs[point, component] = -(
+            radialDerivative + state[point, component] / radius
+        );
+    }
+}
+
+#endif
+
+#if 1
+
+float vtBoundaryDifferenceDerivative(
+    int point,
+    int component,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseSpacing,
+    int derivativeOrder,
+    ITensor<float, 2> rawField,
+    ITensor<float, 2> projectedField
+)
+{
+    int count = vtBoundaryCount(axis, nx, ny, nz);
+    int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+    int offsets[5] = {};
+    float weights[5] = {};
+    int samples = 0;
+    float denominator = 2.0;
+    if (derivativeOrder == 4 && count >= 5)
+    {
+        denominator = 12.0;
+        samples = 5;
+        if (coordinate == 0)
+        {
+            offsets[0] = 0; offsets[1] = 1; offsets[2] = 2;
+            offsets[3] = 3; offsets[4] = 4;
+            weights[0] = -25.0; weights[1] = 48.0;
+            weights[2] = -36.0; weights[3] = 16.0;
+            weights[4] = -3.0;
+        }
+        else if (coordinate == 1)
+        {
+            offsets[0] = -1; offsets[1] = 0; offsets[2] = 1;
+            offsets[3] = 2; offsets[4] = 3;
+            weights[0] = -3.0; weights[1] = -10.0;
+            weights[2] = 18.0; weights[3] = -6.0;
+            weights[4] = 1.0;
+        }
+        else if (coordinate == count - 1)
+        {
+            offsets[0] = 0; offsets[1] = -1; offsets[2] = -2;
+            offsets[3] = -3; offsets[4] = -4;
+            weights[0] = 25.0; weights[1] = -48.0;
+            weights[2] = 36.0; weights[3] = -16.0;
+            weights[4] = 3.0;
+        }
+        else if (coordinate == count - 2)
+        {
+            offsets[0] = 1; offsets[1] = 0; offsets[2] = -1;
+            offsets[3] = -2; offsets[4] = -3;
+            weights[0] = 3.0; weights[1] = 10.0;
+            weights[2] = -18.0; weights[3] = 6.0;
+            weights[4] = -1.0;
+        }
+        else
+        {
+            offsets[0] = -2; offsets[1] = -1; offsets[2] = 0;
+            offsets[3] = 1; offsets[4] = 2;
+            weights[0] = 1.0; weights[1] = -8.0;
+            weights[2] = 0.0; weights[3] = 8.0;
+            weights[4] = -1.0;
+        }
+    }
+    else
+    {
+        samples = 3;
+        if (coordinate == 0)
+        {
+            offsets[0] = 0; offsets[1] = 1; offsets[2] = 2;
+            weights[0] = -3.0; weights[1] = 4.0;
+            weights[2] = -1.0;
+        }
+        else if (coordinate == count - 1)
+        {
+            offsets[0] = 0; offsets[1] = -1; offsets[2] = -2;
+            weights[0] = 3.0; weights[1] = -4.0;
+            weights[2] = 1.0;
+        }
+        else
+        {
+            offsets[0] = -1; offsets[1] = 0; offsets[2] = 1;
+            weights[0] = -1.0; weights[1] = 0.0;
+            weights[2] = 1.0;
+        }
+    }
+    float result = 0.0;
+    for (int sample = 0; sample < samples; ++sample)
+    {
+        int neighbor = vtBoundaryClampedNeighbor(
+            point, axis, offsets[sample], nx, ny, nz
+        );
+        result += weights[sample]
+            * (
+                projectedField[neighbor, component]
+                - rawField[neighbor, component]
+            );
+    }
+    return inverseSpacing * result / denominator;
+}
+
+void theory33VectorGaussBoundaryKernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    float ZA,
+    float ZB,
+    ITensor<float, 2> rawRhs,
+    ITensor<float, 2> projectedRhs,
+    IWTensor<float, 2> finalRhs
+)
+{
+    for (int component = 0; component < 16; ++component)
+        finalRhs[point, component] = projectedRhs[point, component];
+    float correctionA = 0.0;
+    float correctionB = 0.0;
+    int counts[3] = { nx, ny, nz };
+    float inverseSpacing[3] = {
+        inverseDx, inverseDy, inverseDz
+    };
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        if (counts[axis] <= 1)
+            continue;
+        int componentA = 3 + axis;
+        int componentB = 9 + axis;
+        float derivativeA = vtBoundaryDifferenceDerivative(
+            point, componentA, axis, nx, ny, nz,
+            inverseSpacing[axis], derivativeOrder,
+            rawRhs, projectedRhs
+        );
+        float derivativeB = vtBoundaryDifferenceDerivative(
+            point, componentB, axis, nx, ny, nz,
+            inverseSpacing[axis], derivativeOrder,
+            rawRhs, projectedRhs
+        );
+        correctionA += derivativeA / ZA;
+        correctionB += derivativeB / ZB;
+    }
+    finalRhs[point, 12] = rawRhs[point, 12] + correctionA;
+    finalRhs[point, 13] = rawRhs[point, 13] + correctionB;
+}
+
+#endif
+
+#if 1
+
+void theory33LinearBoundaryFlux2Kernel(
+    int point,
+    int outwardSign,
+    ITensor<float, 2> matrix,
+    ITensor<float, 2> state,
+    IWTensor<float, 2> flux
+)
+{
+    float a = matrix[point, 0];
+    float b = matrix[point, 1];
+    float c = matrix[point, 2];
+    float d = matrix[point, 3];
+    float discriminant = max(
+        (a - d) * (a - d) + 4.0 * b * c, 0.0
+    );
+    float root = sqrt(discriminant);
+    float eigenvalues[2] = {};
+    eigenvalues[0] = 0.5 * (a + d - root);
+    eigenvalues[1] = 0.5 * (a + d + root);
+    float right[4] = {};
+    for (int mode = 0; mode < 2; ++mode)
+    {
+        float lambda = eigenvalues[mode];
+        if (abs(b) >= abs(c) && abs(b) > 1.0e-12)
+        {
+            right[mode] = b;
+            right[2 + mode] = lambda - a;
+        }
+        else if (abs(c) > 1.0e-12)
+        {
+            right[mode] = lambda - d;
+            right[2 + mode] = c;
+        }
+        else
+        {
+            right[mode] = mode == 0 ? 1.0 : 0.0;
+            right[2 + mode] = mode == 0 ? 0.0 : 1.0;
+        }
+    }
+    float determinant =
+        right[0] * right[3] - right[1] * right[2];
+    if (abs(determinant) < 1.0e-12)
+    {
+        flux[point, 0] =
+            outwardSign * a >= 0.0 ? a * state[point, 0] : 0.0;
+        flux[point, 1] =
+            outwardSign * d >= 0.0 ? d * state[point, 1] : 0.0;
+        return;
+    }
+    float inverse[4] = {};
+    inverse[0] = right[3] / determinant;
+    inverse[1] = -right[1] / determinant;
+    inverse[2] = -right[2] / determinant;
+    inverse[3] = right[0] / determinant;
+    float modes[2] = {};
+    modes[0] =
+        inverse[0] * state[point, 0]
+        + inverse[1] * state[point, 1];
+    modes[1] =
+        inverse[2] * state[point, 0]
+        + inverse[3] * state[point, 1];
+    for (int mode = 0; mode < 2; ++mode)
+    {
+        if (outwardSign * eigenvalues[mode] < 0.0)
+            modes[mode] = 0.0;
+        else
+            modes[mode] *= eigenvalues[mode];
+    }
+    flux[point, 0] =
+        right[0] * modes[0] + right[1] * modes[1];
+    flux[point, 1] =
+        right[2] * modes[0] + right[3] * modes[1];
+}
+
+#endif
+
+void theory33FullOutflowBoundaryFluxKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    ITensor<float, 2> state,
+    ITensor<float, 2> primitive,
+    ITensor<float, 2> flux,
+    IWTensor<float, 2> boundaryFlux
+)
+{
+    int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+    int count = vtBoundaryCount(axis, nx, ny, nz);
+    bool lower = coordinate == 0;
+    bool upper = coordinate == count - 1;
+    float transport = state[point, 0] != 0.0
+        ? flux[point, 0] / state[point, 0]
+        : primitive[point, 2 + axis];
+    bool incoming =
+        (lower && transport > 0.0)
+        || (upper && transport < 0.0);
+    for (int component = 0; component < 11; ++component)
+    {
+        boundaryFlux[point, component] =
+            (lower || upper) && !incoming
+            ? flux[point, component]
+            : 0.0;
+    }
+}
+
+void theory33FullOutflowDirectionalRhsKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseSpacing,
+    ITensor<float, 2> interfaceFlux,
+    ITensor<float, 2> boundaryFlux,
+    ITensor<float, 2> pathData,
+    IWTensor<float, 2> rhs
+)
+{
+    int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+    int count = vtBoundaryCount(axis, nx, ny, nz);
+    int previous = vtBoundaryClampedNeighbor(
+        point, axis, -1, nx, ny, nz
+    );
+    int following = vtBoundaryClampedNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    float coefficientRight =
+        0.5 * (pathData[point, 0] + pathData[following, 0]);
+    float coefficientLeft =
+        0.5 * (pathData[point, 0] + pathData[previous, 0]);
+    float transportedRight =
+        0.5 * (pathData[point, 2] + pathData[following, 2]);
+    float transportedLeft =
+        0.5 * (pathData[point, 2] + pathData[previous, 2]);
+    float pathSource =
+        coefficientRight
+        * (pathData[following, 1] - pathData[point, 1])
+        + coefficientLeft
+        * (pathData[point, 1] - pathData[previous, 1])
+        + transportedRight
+        * (pathData[following, 3] - pathData[point, 3])
+        + transportedLeft
+        * (pathData[point, 3] - pathData[previous, 3]);
+    for (int component = 0; component < 11; ++component)
+    {
+        float rightFlux = coordinate == count - 1
+            ? boundaryFlux[point, component]
+            : interfaceFlux[point, component];
+        float leftFlux = coordinate == 0
+            ? boundaryFlux[point, component]
+            : interfaceFlux[previous, component];
+        rhs[point, component] =
+            -(rightFlux - leftFlux) * inverseSpacing
+            + (
+                component == 6 + axis
+                ? 0.5 * inverseSpacing * pathSource
+                : 0.0
+            );
+    }
+}
+
+void theory33FullRoeOutflowDirectionalRhsKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    float inverseSpacing,
+    ITensor<float, 2> state,
+    ITensor<float, 2> interfaceFlux,
+    ITensor<float, 2> boundaryFlux,
+    ITensor<float, 2> pathSymbol,
+    IWTensor<float, 2> rhs
+)
+{
+    int coordinate = vtBoundaryCoordinate(point, axis, nx, ny);
+    int count = vtBoundaryCount(axis, nx, ny, nz);
+    int previous = vtBoundaryClampedNeighbor(
+        point, axis, -1, nx, ny, nz
+    );
+    int following = vtBoundaryClampedNeighbor(
+        point, axis, 1, nx, ny, nz
+    );
+    float rightPathJump[9] = {};
+    float leftPathJump[9] = {};
+    for (int row = 0; row < 9; ++row)
+    {
+        for (int column = 0; column < 9; ++column)
+        {
+            rightPathJump[row] +=
+                pathSymbol[point, row * 9 + column]
+                * (
+                    state[following, column]
+                    - state[point, column]
+                );
+            leftPathJump[row] +=
+                pathSymbol[previous, row * 9 + column]
+                * (
+                    state[point, column]
+                    - state[previous, column]
+                );
+        }
+    }
+    for (int component = 0; component < 11; ++component)
+    {
+        float rightFlux = coordinate == count - 1
+            ? boundaryFlux[point, component]
+            : interfaceFlux[point, component];
+        float leftFlux = coordinate == 0
+            ? boundaryFlux[point, component]
+            : interfaceFlux[previous, component];
+        float pathFluctuation = component < 9
+            ? 0.5
+            * (
+                rightPathJump[component]
+                + leftPathJump[component]
+            )
+            : 0.0;
+        rhs[point, component] =
+            -(rightFlux - leftFlux) * inverseSpacing
+            - pathFluctuation * inverseSpacing;
+    }
+}
+
 void theory33FullStageKernel(
     int point,
     float dt,
@@ -4600,8 +8156,10 @@ void theory33FullProjectEntropyKernel(
 {
     for (int component = 0; component < 11; ++component)
         stateOutput[point, component] = stateInput[point, component];
-    stateOutput[point, 9] =
-        stateInput[point, 0] * primitive[point, 1];
+    // Entropy is already an evolved conservative density. Recovery uses its
+    // specific value as the thermodynamic coordinate; overwriting it with a
+    // float32 recovered product at every RK stage creates secular entropy
+    // loss. Physical entropy production is applied by the implicit drag map.
 }
 
 float vtRelativeGammaCurved(
@@ -5088,6 +8646,168 @@ float vtWeno5Z(
         / (alpha0 + alpha1 + alpha2);
 }
 
+float vtProjectedSplit11(
+    int face,
+    int following,
+    int sample,
+    int mode,
+    float signValue,
+    float speed,
+    ITensor<float, 2> state,
+    ITensor<float, 2> flux,
+    ITensor<float, 2> rightBasis,
+    ITensor<float, 2> leftBasis,
+    ITensor<float, 2> entropyModes
+)
+{
+    float physical[9] = {};
+    for (int component = 0; component < 9; ++component)
+    {
+        physical[component] =
+            flux[sample, component]
+            + signValue * speed * state[sample, component];
+    }
+    if (mode < 9)
+    {
+        float value = 0.0;
+        for (int component = 0; component < 9; ++component)
+        {
+            value +=
+                leftBasis[face, mode * 9 + component]
+                * physical[component];
+        }
+        return value;
+    }
+    float passive =
+        flux[sample, mode]
+        + signValue * speed * state[sample, mode];
+    if (mode == 9)
+    {
+        for (int physicalMode = 0; physicalMode < 9; ++physicalMode)
+        {
+            float amplitude = 0.0;
+            for (int component = 0; component < 9; ++component)
+            {
+                amplitude +=
+                    leftBasis[
+                        face, physicalMode * 9 + component
+                    ]
+                    * physical[component];
+            }
+            passive -=
+                entropyModes[face, physicalMode] * amplitude;
+        }
+        return passive;
+    }
+    float leftTracer =
+        state[face, 10] / max(abs(state[face, 0]), VT_EPSILON);
+    float rightTracer =
+        state[following, 10]
+        / max(abs(state[following, 0]), VT_EPSILON);
+    return
+        passive
+        - 0.5 * (leftTracer + rightTracer) * physical[0];
+}
+
+void theory33FullCharacteristicInterfaceKernel(
+    int point,
+    int axis,
+    int nx,
+    int ny,
+    int nz,
+    ITensor<float, 2> state,
+    ITensor<float, 2> flux,
+    ITensor<float, 1> speed,
+    ITensor<float, 2> rightBasis,
+    ITensor<float, 2> leftBasis,
+    ITensor<float, 2> entropyModes,
+    IRWTensor<float, 2> interfaceFlux
+)
+{
+    int im2 = vtGridNeighbor(point, axis, -2, nx, ny, nz);
+    int im1 = vtGridNeighbor(point, axis, -1, nx, ny, nz);
+    int ip1 = vtGridNeighbor(point, axis, 1, nx, ny, nz);
+    int ip2 = vtGridNeighbor(point, axis, 2, nx, ny, nz);
+    int ip3 = vtGridNeighbor(point, axis, 3, nx, ny, nz);
+    float faceSpeed = max(speed[point], speed[ip1]) / 1.35;
+    faceSpeed = clamp(faceSpeed, 1.0e-4, 1.0);
+    float characteristic[11] = {};
+    for (int mode = 0; mode < 11; ++mode)
+    {
+        float plus = vtWeno5Z(
+            vtProjectedSplit11(
+                point, ip1, im2, mode, 1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, im1, mode, 1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, point, mode, 1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, ip1, mode, 1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, ip2, mode, 1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            )
+        );
+        float minus = vtWeno5Z(
+            vtProjectedSplit11(
+                point, ip1, ip3, mode, -1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, ip2, mode, -1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, ip1, mode, -1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, point, mode, -1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            ),
+            vtProjectedSplit11(
+                point, ip1, im1, mode, -1.0, faceSpeed,
+                state, flux, rightBasis, leftBasis, entropyModes
+            )
+        );
+        characteristic[mode] = 0.5 * (plus + minus);
+    }
+    for (int component = 0; component < 9; ++component)
+    {
+        float value = 0.0;
+        for (int mode = 0; mode < 9; ++mode)
+        {
+            value +=
+                rightBasis[point, component * 9 + mode]
+                * characteristic[mode];
+        }
+        interfaceFlux[point, component] = value;
+    }
+    float entropyValue = characteristic[9];
+    for (int mode = 0; mode < 9; ++mode)
+    {
+        entropyValue +=
+            entropyModes[point, mode] * characteristic[mode];
+    }
+    interfaceFlux[point, 9] = entropyValue;
+    float leftTracer =
+        state[point, 10] / max(abs(state[point, 0]), VT_EPSILON);
+    float rightTracer =
+        state[ip1, 10] / max(abs(state[ip1, 0]), VT_EPSILON);
+    interfaceFlux[point, 10] =
+        characteristic[10]
+        + 0.5 * (leftTracer + rightTracer)
+        * interfaceFlux[point, 0];
+}
+
 void theory33InterfaceKernel(
     int point,
     int reconstructionMode,
@@ -5252,6 +8972,78 @@ void theory33CharacteristicInterfaceKernel(
                 * characteristic[mode];
         }
         highInterface[point, component] = value;
+    }
+}
+
+void theory33CharacteristicRoeInterfaceKernel(
+    int point,
+    ITensor<float, 2> state,
+    ITensor<float, 2> flux,
+    ITensor<float, 2> rightBasis,
+    ITensor<float, 2> leftBasis,
+    ITensor<float, 2> eigenvalues,
+    IRWTensor<float, 2> highInterface
+)
+{
+    int count = int(state.shape[0]);
+    int following = point + 1 == count ? 0 : point + 1;
+    float speed = 0.0;
+    for (int mode = 0; mode < 5; ++mode)
+        speed = max(speed, abs(eigenvalues[point, mode]));
+    speed = clamp(speed, 1.0e-4, 1.0);
+
+    float characteristicJump[5] = {};
+    for (int mode = 0; mode < 5; ++mode)
+    {
+        for (int component = 0; component < 5; ++component)
+        {
+            characteristicJump[mode] +=
+                leftBasis[point, mode * 5 + component]
+                * (
+                    state[following, component]
+                    - state[point, component]
+                );
+        }
+    }
+    for (int component = 0; component < 5; ++component)
+    {
+        float dissipation = 0.0;
+        for (int mode = 0; mode < 5; ++mode)
+        {
+            float rate =
+                0.5 * abs(eigenvalues[point, mode])
+                + 0.5 * speed;
+            dissipation +=
+                rightBasis[point, component * 5 + mode]
+                * rate
+                * characteristicJump[mode];
+        }
+        highInterface[point, component] =
+            0.5 * (
+                flux[point, component]
+                + flux[following, component]
+            )
+            - 0.5 * dissipation;
+    }
+
+    // Entropy and tracer are passive extensions of the independent
+    // five-field Carter block. Their characteristic speed is the material
+    // transport speed; the zero-transport contact used by the parity
+    // campaign reduces to the same half-Rusanov rate used by the CPU
+    // extended Roe basis.
+    for (int component = 5; component < VT_STATE_WIDTH; ++component)
+    {
+        highInterface[point, component] =
+            0.5 * (
+                flux[point, component]
+                + flux[following, component]
+            )
+            - 0.25
+            * speed
+            * (
+                state[following, component]
+                - state[point, component]
+            );
     }
 }
 

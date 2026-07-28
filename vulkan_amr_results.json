@@ -1,0 +1,63 @@
+{
+  "backend": "Slang/Vulkan",
+  "gauss_projection": {
+    "gauss_A_linf": 2.6081493187390947e-08,
+    "gauss_B_linf": 2.608149374250246e-08,
+    "longitudinal_cpu_maximum_absolute_error": 2.608149374250246e-08
+  },
+  "qualification": {
+    "berger_colella_reflux_is_componentwise_conservative": true,
+    "one_to_three_dimensional_prolongation_matches_cpu": true,
+    "restriction_restores_parent_average": true,
+    "theory3_gauss_projection_matches_cpu": true
+  },
+  "qualified": true,
+  "refinement_ratio": 2,
+  "reflux": {
+    "global_component_balance_linf": 0.0,
+    "lower_face_maximum_absolute_error": 0.0,
+    "upper_face_maximum_absolute_error": 0.0
+  },
+  "schema": "vulkan-tesseract.amr-primitives.v1",
+  "transfer": [
+    {
+      "coarse_shape": [
+        8
+      ],
+      "dimensions": 1,
+      "fine_shape": [
+        16
+      ],
+      "parent_conservation_maximum_absolute_error": 7.450580596923828e-09,
+      "prolong_cpu_maximum_absolute_error": 1.3969838619232178e-08
+    },
+    {
+      "coarse_shape": [
+        4,
+        5
+      ],
+      "dimensions": 2,
+      "fine_shape": [
+        8,
+        10
+      ],
+      "parent_conservation_maximum_absolute_error": 7.450580596923828e-09,
+      "prolong_cpu_maximum_absolute_error": 2.9802322387695312e-08
+    },
+    {
+      "coarse_shape": [
+        4,
+        5,
+        6
+      ],
+      "dimensions": 3,
+      "fine_shape": [
+        8,
+        10,
+        12
+      ],
+      "parent_conservation_maximum_absolute_error": 2.384185791015625e-07,
+      "prolong_cpu_maximum_absolute_error": 7.450580596923828e-08
+    }
+  ]
+}

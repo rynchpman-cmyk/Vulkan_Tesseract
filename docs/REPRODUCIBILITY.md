@@ -60,6 +60,43 @@ Writes `vulkan_frozen_neural_results.json` and checks digest-locked
 constitutive replay, cellwise hard-phase agreement, dynamic branch movement,
 physical margins, and conservation.
 
+To run the literal initial state and horizon of the original learned-phase
+Riemann campaign through the resident longitudinal Carter Roe path:
+
+```powershell
+.\run_vulkan_frozen_neural.ps1 `
+    -Resolutions "16,32,64,128" `
+    -FinalTime 0.02 `
+    -Cfl 0.12 `
+    -Problem original_neural_phase_riemann `
+    -Reconstruction carter_characteristic_roe `
+    -PositivityPreserving `
+    -Output vulkan_original_neural_phase_roe_results.json
+```
+
+This remains the restricted five-field control. The complete original
+nine-field plus entropy/tracer `full_carter_roe` reproduction is:
+
+```powershell
+.\run_vulkan_original_neural_phase_riemann.ps1
+```
+
+It writes `vulkan_original_neural_phase_full_roe_results.json` and requires
+the original 0/0/0/4 phase-change pattern in addition to recovery,
+eigensystem, causality, convexity, conservation, convergence, and
+device-residency gates.
+
+### Original analytic Carter shock ladders
+
+```powershell
+.\run_vulkan_carter_riemann.ps1
+```
+
+Writes `vulkan_carter_riemann_results.json` and reproduces the original
+counterflow-shock and colliding-stream ladders with the complete resident
+nine-field eigensystem, entropy/tracer extension, DLM path fluctuation, and
+SSP-RK3 constitutive projection.
+
 ### WENO5-Z and positivity
 
 ```powershell
@@ -69,6 +106,32 @@ physical margins, and conservation.
 Writes `vulkan_weno_results.json` and measures fifth-order interfaces,
 low/high conservative flux blending, limiter activation, smooth parity, and
 learned-phase evolution.
+
+The complete nine-physical-field plus entropy/tracer characteristic path is:
+
+```powershell
+.\run_vulkan_full_carter_weno.ps1
+```
+
+It writes `vulkan_full_carter_weno_results.json` and checks the resident RHS
+against the float64 full-Carter WENO oracle before a three-level smooth
+device-resident convergence study.
+
+### Resident constrained CMC/Picard ladder
+
+```powershell
+.\run_vulkan_constrained.ps1
+```
+
+Writes `vulkan_constrained_results.json`. The runner constructs the analytic
+and frozen active-counterflow states on Vulkan, solves the periodic CMC
+equations through explicit fp64 Vulkan compute entry points, packs the result
+into CCZ4, and evolves the `8/16/32` Carter/Proca/CCZ4 ladder without state
+readbacks. Independent CPU diagnostics gate elliptic residuals, initial and
+final second-order constraints, conservation, switching, characteristics,
+absolute micro-horizon energy balance, and trajectory agreement. Resolved
+geometric-work-rate convergence is gated separately by the 2D frontier
+ladder.
 
 ### Numerical Carter eigensystem
 
@@ -93,6 +156,17 @@ implicit entropy-producing drag, the complete curved `9 x 9` Carter
 eigensystem in every direction, CCZ4 algebraic projection, physical geometry,
 and matter-source injection.
 
+### Evolved mixed massive-vector fields
+
+```powershell
+.\run_vulkan_mixed_proca.ps1
+```
+
+Writes `vulkan_mixed_proca_results.json`. It independently compares the
+curved mixed-Proca RHS, derived magnetic fields, Gauss cleaning, and SSP-RK3
+evolution with the float64 Theory 3 oracle, then compares a complete
+CCZ4/Proca/Carter coupled step with the CPU engine.
+
 ### Coupled multidimensional evolution
 
 ```powershell
@@ -109,7 +183,80 @@ requires:
 - determinant and tracefree CCZ4 projection;
 - a resolved frozen-neural switching margin;
 - finite matter, stress, and geometry outputs; and
+- exact coupled checkpoint roundtrip with deterministic continuation; and
 - zero host readbacks during evolution.
+
+### Long-horizon and multidimensional frontier
+
+```powershell
+.\run_vulkan_frontier.ps1
+```
+
+Writes `vulkan_frontier_results.json`. It requires analytic and frozen
+128-step device-resident evolution with complete high-order reconstruction,
+a `6/12/24` two-dimensional continuum ladder, resolved geometric-work-rate
+convergence, and an active three-dimensional learned-physics smoke run.
+
+### Fourth-order CCZ4
+
+```powershell
+.\run_vulkan_ccz4_fd4.ps1
+```
+
+Writes `vulkan_ccz4_fd4_results.json`. It compares the resident FD4 vacuum
+operator against the original float64 Cartesian FD4 oracle and gates the
+complete coupled evolution, projection, recovery, conservation, restart, and
+zero-readback contracts.
+
+### Physical boundaries
+
+```powershell
+.\run_vulkan_boundaries.ps1
+```
+
+Writes `vulkan_boundary_results.json`. It compares real characteristic
+projection, Carter no-inflow outflow, CCZ4 Sommerfeld/Z4 projection, and
+mixed-Proca radiative/Gauss correction with the CPU operators. Both FD2 and
+one-sided FD4 boundary stencils are tested, including a complete
+Carter–Proca–CCZ4 FD4 resident step.
+
+### AMR primitives
+
+```powershell
+.\run_vulkan_amr.ps1
+```
+
+Writes `vulkan_amr_results.json`. It qualifies conservative prolongation and
+restriction in one through three dimensions, componentwise Berger–Colella
+reflux, and the Theory 3 Gauss projection.
+
+### TOV and isolated CTT
+
+```powershell
+.\run_vulkan_tov.ps1
+.\run_vulkan_isolated_ctt.ps1
+```
+
+These write `vulkan_tov_results.json` and
+`vulkan_isolated_ctt_results.json`. They qualify fp64 resident TOV recurrence,
+Cartesian strong-field sampling, a finite active evolution with zero stage
+readbacks, complete deterministic restart, and the fp64 isolated CTT
+constraint solve against the original implementations.
+
+### Exhaustive capability audit
+
+```powershell
+.\run_vulkan_original_workflows.ps1
+.\run_vulkan_parity.ps1
+```
+
+The first command writes `vulkan_original_workflows_results.json` after
+executing the complete Carter/KKT recurrence VJP, native master AD, recurrent
+BPTT, Theory 3.3 reverse mode, frozen constitutive replay, and the conditioned
+128-step audit. The second writes `vulkan_parity_results.json`; it requires
+every declared resident artifact to pass, every retained host workflow to
+exist, all original computational sources to match their local counterparts,
+and a complete SHA-256 manifest of the production Vulkan implementation.
 
 ## Short live regressions
 

@@ -1,0 +1,52 @@
+{
+  "backend": "Slang/Vulkan",
+  "baryonic_mass": 1.5061765775020015,
+  "central_density": 0.00128,
+  "checkpoint_continuation_error": 1.7763568394002505e-15,
+  "checkpoint_geometry_roundtrip_error": 4.440892098500626e-16,
+  "checkpoint_state_roundtrip_error": 0.0,
+  "checkpoint_vector_roundtrip_error": 0.0,
+  "conformal_determinant_linf": 5.960464477539062e-07,
+  "evolution_points": 64,
+  "evolution_steps": 8,
+  "gamma_hat_constraint_linf": 1.601874828338623e-07,
+  "gravitational_mass": 1.4001527640562534,
+  "host_reads_during_evolution": 0,
+  "hydrostatic_relative_l2": 2.599449487479974e-06,
+  "invalid_recoveries": 0,
+  "maximum_geometry_change": 3.034346036656643e-07,
+  "maximum_matter_change": 5.047695594839752e-10,
+  "maximum_recovery_residual": 1.5318835721700452e-05,
+  "profile_maximum_absolute_errors": {
+    "density": 3.233551989535732e-11,
+    "enclosed_mass": 5.588255191923963e-08,
+    "energy_density": 4.061341280642283e-11,
+    "lapse": 8.63707808607117e-08,
+    "pressure": 8.277892992380673e-12,
+    "radial_metric": 2.09780006699134e-08,
+    "radius": 2.1401776884033552e-07
+  },
+  "profile_points": 958,
+  "qualification": {
+    "cartesian_strong_field_sampling_matches_profile": true,
+    "complete_evolved_checkpoint_is_deterministic": true,
+    "fp64_tov_profile_matches_original": true,
+    "hydrostatic_residual_is_converged": true,
+    "sampled_z4_constraint_is_algebraically_zero": true,
+    "standard_gamma_two_star_is_reproduced": true,
+    "strong_field_evolution_is_device_resident": true,
+    "strong_field_recovery_remains_valid": true,
+    "strong_field_step_is_finite_and_active": true
+  },
+  "qualified": true,
+  "radial_spacing": 0.01,
+  "sampled_lapse_maximum_absolute_error": 2.976410296007259e-08,
+  "sampled_metric_maximum_absolute_error": 1.720068798505281e-07,
+  "scalar_absolute_errors": {
+    "baryonic_mass": 1.4773229972675495e-08,
+    "gravitational_mass": 1.2704200136326449e-08,
+    "surface_radius": 2.1401776884033552e-07
+  },
+  "schema": "vulkan-tesseract.tov-strong-field.v1",
+  "surface_radius": 9.574999785982072
+}

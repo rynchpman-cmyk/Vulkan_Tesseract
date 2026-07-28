@@ -1,0 +1,306 @@
+{
+  "backend": "Slang/Vulkan",
+  "colliding_streams": {
+    "cfl": 0.15,
+    "constitutive_model": "analytic_m1",
+    "diagnostics": [
+      {
+        "baryon_relative_balance_error": 0.0,
+        "carrier_relative_balance_error": 9.301335746223844e-08,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9660274982452393,
+        "maximum_eigenpair_residual": 0.0019322519656270742,
+        "maximum_recovery_residual": 5.301494070408808e-07,
+        "minimum_carrier_density": 0.0030005963542734603,
+        "minimum_density": 0.06500061018966272,
+        "minimum_legendre_eigenvalue": 0.9507010097761776,
+        "minimum_thermodynamic_eigenvalue": 0.8526855447077861,
+        "points": 16,
+        "recovery_failures": 0,
+        "steps": 3
+      },
+      {
+        "baryon_relative_balance_error": 8.512645108676684e-08,
+        "carrier_relative_balance_error": 9.301334881075457e-08,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9708974361419678,
+        "maximum_eigenpair_residual": 0.0019519055495038629,
+        "maximum_recovery_residual": 1.9827616597467568e-06,
+        "minimum_carrier_density": 0.0029999997717233408,
+        "minimum_density": 0.06500000579570088,
+        "minimum_legendre_eigenvalue": 0.9506943273360107,
+        "minimum_thermodynamic_eigenvalue": 0.8526763387077522,
+        "points": 32,
+        "recovery_failures": 0,
+        "steps": 5
+      },
+      {
+        "baryon_relative_balance_error": 0.0,
+        "carrier_relative_balance_error": 9.301335746223844e-08,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9746581315994263,
+        "maximum_eigenpair_residual": 0.002059935126453638,
+        "maximum_recovery_residual": 1.3969088286103215e-06,
+        "minimum_carrier_density": 0.0029999997717233408,
+        "minimum_density": 0.06500000579570088,
+        "minimum_legendre_eigenvalue": 0.9506943273360107,
+        "minimum_thermodynamic_eigenvalue": 0.8526763387077522,
+        "points": 64,
+        "recovery_failures": 0,
+        "steps": 9
+      },
+      {
+        "baryon_relative_balance_error": 8.512643659374395e-08,
+        "carrier_relative_balance_error": 1.8602671492447688e-07,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9771270751953125,
+        "maximum_eigenpair_residual": 0.002465934492647648,
+        "maximum_recovery_residual": 1.9400652035983512e-06,
+        "minimum_carrier_density": 0.0029999997717233408,
+        "minimum_density": 0.06500000579570088,
+        "minimum_legendre_eigenvalue": 0.9506943273360107,
+        "minimum_thermodynamic_eigenvalue": 0.8526763387077522,
+        "points": 128,
+        "recovery_failures": 0,
+        "steps": 18
+      }
+    ],
+    "final_time": 0.02,
+    "observed_orders": [
+      0.8654166907094796,
+      0.8925755991943899
+    ],
+    "problem": "colliding_streams",
+    "qualification": {
+      "all_eigensystems_valid": true,
+      "all_recoveries_valid": true,
+      "all_symbols_causal": true,
+      "device_resident_between_snapshots": true,
+      "legendre_margins_positive": true,
+      "periodic_number_balances_close": true,
+      "positive_densities": true,
+      "shock_order_resolved": true,
+      "successive_error_decreases": true,
+      "thermodynamic_margins_positive": true
+    },
+    "qualified": true,
+    "reconstruction": "full_carter_roe",
+    "resolutions": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "successive_field_l1_errors": [
+      {
+        "baryon_density": 0.010554158128798008,
+        "carrier_density": 0.018530867993831635,
+        "carrier_velocity": 0.05182100087404251,
+        "fluid_velocity": 0.04692216217517853,
+        "phase_two": 0.0,
+        "pressure": 0.019185373559594154,
+        "relative_lorentz_factor": 0.0017033993499353528
+      },
+      {
+        "baryon_density": 0.0077250804752111435,
+        "carrier_density": 0.01221795380115509,
+        "carrier_velocity": 0.021693089976906776,
+        "fluid_velocity": 0.02447802759706974,
+        "phase_two": 0.0,
+        "pressure": 0.01431985292583704,
+        "relative_lorentz_factor": 0.0011949287727475166
+      },
+      {
+        "baryon_density": 0.004632953088730574,
+        "carrier_density": 0.00773498835042119,
+        "carrier_velocity": 0.011049911379814148,
+        "fluid_velocity": 0.01084444485604763,
+        "phase_two": 0.0,
+        "pressure": 0.008874846622347832,
+        "relative_lorentz_factor": 0.0008324130903929472
+      }
+    ],
+    "successive_l1_errors": [
+      0.024786160346896697,
+      0.01360482225815455,
+      0.0073282595646257205
+    ]
+  },
+  "counterflow_shock": {
+    "cfl": 0.15,
+    "constitutive_model": "analytic_m1",
+    "diagnostics": [
+      {
+        "baryon_relative_balance_error": 8.277411828802264e-08,
+        "carrier_relative_balance_error": 9.782807010163847e-08,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9620904922485352,
+        "maximum_eigenpair_residual": 0.0009533253032714128,
+        "maximum_recovery_residual": 9.797300890568295e-07,
+        "minimum_carrier_density": 0.003500282784787734,
+        "minimum_density": 0.07000060098341264,
+        "minimum_legendre_eigenvalue": 0.965222814541274,
+        "minimum_thermodynamic_eigenvalue": 0.8750535864446042,
+        "points": 16,
+        "recovery_failures": 0,
+        "steps": 3
+      },
+      {
+        "baryon_relative_balance_error": 8.277411828802264e-08,
+        "carrier_relative_balance_error": 9.782807010163847e-08,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9645616412162781,
+        "maximum_eigenpair_residual": 0.0011460589012131095,
+        "maximum_recovery_residual": 1.5297214304155204e-06,
+        "minimum_carrier_density": 0.003500000724185456,
+        "minimum_density": 0.07000000016601346,
+        "minimum_legendre_eigenvalue": 0.9652185301472541,
+        "minimum_thermodynamic_eigenvalue": 0.8750473368666908,
+        "points": 32,
+        "recovery_failures": 0,
+        "steps": 5
+      },
+      {
+        "baryon_relative_balance_error": 8.277411828802264e-08,
+        "carrier_relative_balance_error": 9.782807010163847e-08,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9680001139640808,
+        "maximum_eigenpair_residual": 0.0018137849401682615,
+        "maximum_recovery_residual": 1.8307167692910298e-06,
+        "minimum_carrier_density": 0.003500000724185456,
+        "minimum_density": 0.07000000016601346,
+        "minimum_legendre_eigenvalue": 0.9652185301472541,
+        "minimum_thermodynamic_eigenvalue": 0.8750473368666908,
+        "points": 64,
+        "recovery_failures": 0,
+        "steps": 9
+      },
+      {
+        "baryon_relative_balance_error": 0.0,
+        "carrier_relative_balance_error": 2.9348421030491543e-07,
+        "host_reads_after_evolution": 1,
+        "host_reads_before_evolution": 1,
+        "invalid_eigensystems": 0,
+        "maximum_characteristic_speed": 0.9710371494293213,
+        "maximum_eigenpair_residual": 0.003267077961936593,
+        "maximum_recovery_residual": 1.5296257060981588e-06,
+        "minimum_carrier_density": 0.003500000724185456,
+        "minimum_density": 0.07000000016601346,
+        "minimum_legendre_eigenvalue": 0.9652185301472541,
+        "minimum_thermodynamic_eigenvalue": 0.8750473368666908,
+        "points": 128,
+        "recovery_failures": 0,
+        "steps": 18
+      }
+    ],
+    "final_time": 0.02,
+    "observed_orders": [
+      1.013039291928627,
+      1.0010925098510326
+    ],
+    "problem": "counterflow_shock",
+    "qualification": {
+      "all_eigensystems_valid": true,
+      "all_recoveries_valid": true,
+      "all_symbols_causal": true,
+      "device_resident_between_snapshots": true,
+      "legendre_margins_positive": true,
+      "periodic_number_balances_close": true,
+      "positive_densities": true,
+      "shock_order_resolved": true,
+      "successive_error_decreases": true,
+      "thermodynamic_margins_positive": true
+    },
+    "qualified": true,
+    "reconstruction": "full_carter_roe",
+    "resolutions": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "successive_field_l1_errors": [
+      {
+        "baryon_density": 0.009309770539402962,
+        "carrier_density": 0.01263086125254631,
+        "carrier_velocity": 0.05528324469923973,
+        "fluid_velocity": 0.0666600838303566,
+        "phase_two": 0.0,
+        "pressure": 0.01899569481611252,
+        "relative_lorentz_factor": 0.0005393251194618642
+      },
+      {
+        "baryon_density": 0.006745822727680206,
+        "carrier_density": 0.008193070068955421,
+        "carrier_velocity": 0.02300180308520794,
+        "fluid_velocity": 0.028443079441785812,
+        "phase_two": 0.0,
+        "pressure": 0.01415971852838993,
+        "relative_lorentz_factor": 0.00043082109186798334
+      },
+      {
+        "baryon_density": 0.003992662765085697,
+        "carrier_density": 0.005170553922653198,
+        "carrier_velocity": 0.01122364867478609,
+        "fluid_velocity": 0.01101633533835411,
+        "phase_two": 0.0,
+        "pressure": 0.008760384283959866,
+        "relative_lorentz_factor": 0.00029292437830008566
+      }
+    ],
+    "successive_l1_errors": [
+      0.027236496709519997,
+      0.013495719157314548,
+      0.006742751560523175
+    ]
+  },
+  "precision": "float32 device / float64 physical audit",
+  "principal_system": {
+    "extended_reconstruction_fields": 11,
+    "path": "straight-state DLM midpoint fluctuation",
+    "physical_fields": 9,
+    "riemann_flux": "conditioned full-eigensystem Roe-Rusanov blend",
+    "time_integrator": "SSP-RK3 with constitutive projection"
+  },
+  "qualification": {
+    "colliding_all_eigensystems_valid": true,
+    "colliding_all_recoveries_valid": true,
+    "colliding_all_symbols_causal": true,
+    "colliding_device_resident_between_snapshots": true,
+    "colliding_legendre_margins_positive": true,
+    "colliding_periodic_number_balances_close": true,
+    "colliding_positive_densities": true,
+    "colliding_reference_order_matches": true,
+    "colliding_shock_order_resolved": true,
+    "colliding_successive_error_decreases": true,
+    "colliding_thermodynamic_margins_positive": true,
+    "counterflow_all_eigensystems_valid": true,
+    "counterflow_all_recoveries_valid": true,
+    "counterflow_all_symbols_causal": true,
+    "counterflow_device_resident_between_snapshots": true,
+    "counterflow_legendre_margins_positive": true,
+    "counterflow_periodic_number_balances_close": true,
+    "counterflow_positive_densities": true,
+    "counterflow_reference_order_matches": true,
+    "counterflow_shock_order_resolved": true,
+    "counterflow_successive_error_decreases": true,
+    "counterflow_thermodynamic_margins_positive": true
+  },
+  "qualified": true,
+  "reference_schema": "tesseract.full-carter-riemann-frontier.v1",
+  "schema": "vulkan-tesseract.full-carter-riemann-frontier.v1"
+}

@@ -5,7 +5,9 @@
 | Layer | File | Role |
 |---|---|---|
 | Device physics | `tesseract_nr_gpu.slang` | Carter recovery, constitutive response, stress, transport, sources, eigensystems, and CCZ4 |
+| Device fp64 setup | `tesseract_cmc_fp64.slang`, `tesseract_ctt_fp64.slang`, `tesseract_tov_fp64.slang` | Periodic CMC, isolated CTT, and TOV recurrence |
 | Device control | `tesseract_nr/vulkan_backend.py` | Resident buffers, dispatch graph, splitting, initialization, and explicit snapshots |
+| Boundary and AMR control | `tesseract_nr/vulkan_boundary.py`, `tesseract_nr/vulkan_amr.py` | Physical boundaries, transfer, reflux, and Gauss projection |
 | CPU oracle | `tesseract_nr/` | Independent float64 geometry, matter, recovery, transport, and diagnostics |
 | Qualification | `tesseract_nr/vulkan_validation.py` | CPU/GPU comparisons and tracked acceptance gates |
 | Frozen closure | `theory33_qualified_frozen.slang` | Digest-locked learned constitutive inference |
@@ -92,12 +94,13 @@ For every active direction, the device evaluates:
 3. entropy and tracer transport;
 4. canonical-momentum DLM path data;
 5. a coordinate characteristic-speed bound;
-6. periodic Rusanov face fluxes; and
+6. Rusanov, full-Carter Roe, or full characteristic WENO5-Z face fluxes; and
 7. directional flux divergence plus midpoint path source.
 
-Directional RHS buffers are summed after all face passes. The current full
-curved interface uses the robust Rusanov baseline. Component and restricted
-characteristic WENO kernels remain available as qualified earlier layers.
+Directional RHS buffers are summed after all face passes. The robust Rusanov
+baseline, complete eleven-field Carter Roe/DLM path, and characteristic
+WENO5-Z routes are all resident-qualified. Periodic faces wrap on device;
+physical faces apply no-inflow Carter outflow data.
 
 ## Local sources
 
@@ -125,8 +128,26 @@ The packed geometry kernel supplies:
 - `kappa1`, `kappa2`, and `kappa3` damping; and
 - full Eulerian Carter matter sources.
 
-Spatial derivatives are periodic centered FD2 in the current coupled
-qualification.
+Spatial derivatives support centered FD2 and FD4. Periodic stencils wrap on
+device. Isolated domains use matching one-sided FD2/FD4 stencils and apply
+Sommerfeld radiation plus incoming-Z4 constraint damping at the CCZ4
+boundary.
+
+## Evolved mixed-vector boundary path
+
+The mixed-Proca subsystem applies radiative data to both vector pairs and
+then corrects the longitudinal RHS so the semidiscrete Gauss derivative
+vanishes. The FD2 and FD4 routes are independently compared with the CPU
+boundary operator. Physical-boundary Carter, Proca, and CCZ4 stages remain
+resident throughout the complete Strang step.
+
+## Initial data and mesh hierarchy
+
+Periodic active-counterflow data use fp64 resident CMC/Picard kernels.
+Isolated data use the fp64 CTT solver, while the TOV recurrence and Cartesian
+strong-field sampler are likewise resident. AMR support includes
+componentwise conservative prolongation/restriction, Berger–Colella reflux,
+and Theory 3 Gauss projection in one, two, and three dimensions.
 
 ## Time scheduling
 
@@ -150,7 +171,9 @@ geometry stage.
 
 Evolution methods retain device tensors and do not call `to_numpy`.
 Readbacks occur only through explicit snapshot or qualification methods. The
-tracked multidimensional campaign asserts zero host reads during evolution.
+tracked periodic, physical-boundary, frontier, and strong-field campaigns
+assert zero host reads during evolution. Complete checkpoints include Carter,
+mixed-Proca, and CCZ4 dynamic state and gate deterministic continuation.
 
 ## Independent oracle
 

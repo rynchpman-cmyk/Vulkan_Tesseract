@@ -73,7 +73,14 @@ recovery, sources, balance laws, switching margins, and device residency.
 ## Qualification boundary
 
 Agreement with the CPU engine is necessary but not by itself a claim of
-production strong-field convergence. The current Vulkan milestone uses
-periodic centered-FD2 CCZ4 derivatives and a multidirectional Rusanov Carter
-interface. Strong-field ladders, physical boundaries, high-order geometry,
-AMR, and distributed domains remain separate qualification targets.
+universal production validity. The Vulkan engine is qualified for FD2 and
+FD4 CCZ4 derivatives, Rusanov/full-Roe/characteristic-WENO Carter
+interfaces, periodic and radiative/outflow domains, AMR transfer/reflux,
+fp64 constrained and TOV setup, a tracked strong-field resident evolution,
+128-step constrained horizons, a 2D continuum ladder, and a 3D smoke
+campaign.
+
+Those tests establish original-project capability alignment; they do not
+replace problem-specific convergence studies. Longer strong-field ladders,
+new microphysical closures, and multi-GPU Vulkan domain decomposition are
+research and scaling extensions beyond the original qualification surface.

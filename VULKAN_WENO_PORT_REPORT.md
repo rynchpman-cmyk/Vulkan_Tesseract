@@ -93,16 +93,11 @@ CPU artifact tests:
 python -m unittest tests.nr.test_vulkan_reference -v
 ```
 
-## Honest boundary
+## Historical boundary and current status
 
-This is a qualified componentwise WENO5-Z reconstruction, not yet the
-complete Carter characteristic reconstruction. The resident stencil,
-low/high flux pair, admissibility audit, and conservative face limiter are
-now in place. The next promotion replaces the component basis with the
-complete numerical Carter flux/path eigenbasis and uses branch-aware
-one-sided bases at learned phase boundaries.
-
-The restricted characteristic promotion was completed in the next milestone;
-the final curved multidimensional stack currently retains Rusanov as its
-robust eleven-component baseline. See the
-[multidimensional Vulkan evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
+This campaign originally qualified the componentwise WENO5-Z stencil,
+low/high flux pair, admissibility audit, and conservative face limiter. Its
+then-open characteristic promotion has since been completed with the full
+eleven-field Carter flux/path eigenbasis and branch-aware one-sided bases.
+See `vulkan_full_carter_weno_results.json` and the
+[capability alignment manifest](VULKAN_CAPABILITY_PARITY.md).

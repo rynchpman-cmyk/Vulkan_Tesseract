@@ -58,8 +58,8 @@ from initialization data.
 
 ## Derivative-containing CCZ4 operator
 
-The device vacuum operator implements the same periodic centered-FD2 equations
-as `CCZ4Solver.rhs`:
+This campaign's device vacuum operator uses the same periodic centered-FD2
+equations as `CCZ4Solver.rhs`:
 
 - physical and conformal Christoffel symbols;
 - physical Ricci tensor and scalar;
@@ -100,12 +100,12 @@ steps.
 |---|---:|
 | CCZ4 vacuum RHS maximum CPU/GPU error | `2.325e-6` |
 | CCZ4 vacuum RHS RMS CPU/GPU error | `2.295e-7` |
-| Final maximum curved recovery residual | `4.303e-7` |
+| Final maximum curved recovery residual | `2.923e-5` |
 | Invalid final recoveries | `0` |
-| Baryon balance error | `7.217e-7` |
-| Carrier balance error | `9.979e-7` |
-| Tracer balance error | `7.334e-7` |
-| Total entropy change | `+1.942e-5` |
+| Baryon balance error | `4.074e-8` |
+| Carrier balance error | `9.779e-9` |
+| Tracer balance error | `2.328e-8` |
+| Total entropy change | `+1.489e-4` |
 | Projected determinant residual | `0` |
 | Projected trace-`A` residual | `7.276e-12` |
 | Minimum lapse | `0.9940` |
@@ -130,16 +130,12 @@ regression is:
 .\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
 ```
 
-## Honest boundary
+## Historical boundary and current status
 
-The full Carter matter and derivative CCZ4 equations now execute together on
-a multidimensional resident Vulkan grid. This result does not yet claim
-production-scale strong-field stability, high-order CCZ4 derivatives,
-AMR/domain decomposition, physical boundary conditions, or a converged
-coupled spacetime/shock campaign. The current transport face operator is the
-robust Rusanov baseline; the previously qualified characteristic WENO layer
-has not yet been generalized to this full curved eleven-component interface.
-
-Those are now performance, accuracy, and strong-field qualification
-frontiers. The missing foundational execution path identified in the prior
-report is closed.
+This report records the first multidimensional coupled campaign, which uses
+FD2 and the robust Rusanov baseline. Subsequent resident qualifications added
+full eleven-field Carter Roe and characteristic WENO5-Z, 128-step and 2D/3D
+frontiers, FD4, physical boundaries, AMR primitives, fp64 TOV/CTT data,
+strong-field evolution, and complete deterministic restart. See the
+[capability alignment manifest](VULKAN_CAPABILITY_PARITY.md) for current
+scope and evidence.

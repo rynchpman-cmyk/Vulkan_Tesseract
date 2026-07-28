@@ -33,6 +33,7 @@ CCZ4_STATE_WIDTH = 31
 CCZ4_PROJECTION_AUDIT_WIDTH = 3
 FULL_RECOVERY_DIAGNOSTIC_WIDTH = 8
 FULL_DRAG_DIAGNOSTIC_WIDTH = 6
+MIXED_VECTOR_DYNAMIC_WIDTH = 16
 
 STATE_FIELDS = (
     "baryon_density_conserved",
@@ -70,6 +71,18 @@ RECONSTRUCTION_MODES = {
     "piecewise_constant": 0,
     "weno5_z": 1,
     "carter_characteristic_weno5_z": 2,
+    "carter_characteristic_roe": 3,
+}
+
+FULL_RECONSTRUCTION_MODES = {
+    "piecewise_constant": 0,
+    "full_carter_roe": 1,
+    "full_carter_weno5_z": 2,
+}
+
+BOUNDARY_MODES = {
+    "periodic": 0,
+    "radiative_outflow": 1,
 }
 
 EIGEN_AUDIT_FIELDS = (
@@ -226,7 +239,8 @@ class VulkanTheory33Backend:
         if reconstruction not in RECONSTRUCTION_MODES:
             raise ValueError(
                 "reconstruction must be 'piecewise_constant', 'weno5_z', "
-                "or 'carter_characteristic_weno5_z'"
+                "'carter_characteristic_weno5_z', or "
+                "'carter_characteristic_roe'"
             )
         if positivity_floor_factor < 1.0:
             raise ValueError("positivity_floor_factor must be at least one")
@@ -437,7 +451,7 @@ class VulkanTheory33Backend:
             lowInterface=self._low_interface,
             highInterface=self._high_interface,
         )
-        if self.reconstruction_mode == 2:
+        if self.reconstruction_mode in {2, 3}:
             self.module.theory33EigensystemKernel(
                 point=self.grid,
                 modelMode=self.model_mode,
@@ -447,15 +461,26 @@ class VulkanTheory33Backend:
                 eigenvalues=self._eigenvalues,
                 audit=self._eigensystem_audit,
             )
-            self.module.theory33CharacteristicInterfaceKernel(
-                point=self.grid,
-                state=state,
-                flux=self._flux,
-                rightBasis=self._right_basis,
-                leftBasis=self._left_basis,
-                eigenvalues=self._eigenvalues,
-                highInterface=self._high_interface,
-            )
+            if self.reconstruction_mode == 2:
+                self.module.theory33CharacteristicInterfaceKernel(
+                    point=self.grid,
+                    state=state,
+                    flux=self._flux,
+                    rightBasis=self._right_basis,
+                    leftBasis=self._left_basis,
+                    eigenvalues=self._eigenvalues,
+                    highInterface=self._high_interface,
+                )
+            else:
+                self.module.theory33CharacteristicRoeInterfaceKernel(
+                    point=self.grid,
+                    state=state,
+                    flux=self._flux,
+                    rightBasis=self._right_basis,
+                    leftBasis=self._left_basis,
+                    eigenvalues=self._eigenvalues,
+                    highInterface=self._high_interface,
+                )
         if self.positivity_preserving:
             self.module.theory33InterfaceRhsKernel(
                 point=self.grid,
@@ -809,6 +834,278 @@ class VulkanTesseractCoupledSnapshot:
     matter_stress: np.ndarray
     time: float
     steps: int
+
+
+@dataclass(frozen=True)
+class VulkanTesseractEvolvedSnapshot:
+    coupled: VulkanTesseractCoupledSnapshot
+    vector_state: np.ndarray
+    vector_input: np.ndarray
+
+
+@dataclass(frozen=True)
+class VulkanPeriodicCMCReport:
+    converged: bool
+    iterations: int
+    picard_iterations: int
+    hamiltonian_residual_l2: float
+    momentum_residual_l2: float
+    trace_K: float
+    minimum_conformal_factor: float
+    maximum_conformal_factor: float
+    pointwise_momentum_balance: float
+    final_source_relative_change: float
+    scalar_readbacks: int
+
+
+@dataclass
+class VulkanMixedProcaState:
+    tensor: Any
+    vector_input: Any
+    geometry: Any
+    matter_state: Any
+    primitive: Any
+    shape: tuple[int, int, int]
+    time: float = 0.0
+    steps: int = 0
+    host_reads: int = 0
+
+
+@dataclass(frozen=True)
+class VulkanMixedProcaSnapshot:
+    state: np.ndarray
+    rhs: np.ndarray
+    vector_input: np.ndarray
+    geometry: np.ndarray
+    shape: tuple[int, int, int]
+    time: float
+    steps: int
+
+
+class VulkanMixedProcaBackend:
+    """Resident mixed-Proca hyperbolic evolution and Gauss cleaning."""
+
+    def __init__(
+        self,
+        shape: tuple[int, ...],
+        *,
+        lengths: tuple[float, ...] | None = None,
+        cleaning_damping: float = 1.0,
+        module_path: str | Path | None = None,
+    ) -> None:
+        if not 1 <= len(shape) <= 3 or any(value < 4 for value in shape):
+            raise ValueError("mixed-Proca grid needs 1-3 dimensions >= 4")
+        if cleaning_damping < 0.0:
+            raise ValueError("cleaning_damping must be nonnegative")
+        self.shape = tuple(shape) + (1,) * (3 - len(shape))
+        self.ndim = len(shape)
+        self.points = int(np.prod(self.shape))
+        if lengths is None:
+            lengths = (1.0,) * self.ndim
+        if len(lengths) != self.ndim or any(value <= 0 for value in lengths):
+            raise ValueError("lengths must match active dimensions")
+        self.lengths = tuple(float(value) for value in lengths) + (
+            1.0,
+        ) * (3 - self.ndim)
+        self.spacing = tuple(
+            self.lengths[axis] / self.shape[axis] for axis in range(3)
+        )
+        self.cleaning_damping = float(cleaning_damping)
+        self.spy = _slangpy()
+        root = Path(__file__).resolve().parents[1]
+        self.module_path = (
+            root / "tesseract_nr_gpu.slang"
+            if module_path is None
+            else Path(module_path).resolve()
+        )
+        self.device = self.spy.create_device(
+            type=self.spy.DeviceType.vulkan,
+            include_paths=[self.module_path.parent],
+        )
+        self.module = self.spy.Module.load_from_file(
+            self.device, str(self.module_path)
+        )
+        self.grid = self.spy.grid(shape=(self.points,))
+        tensor = self.spy.Tensor.empty
+        matrix = lambda width: tensor(
+            self.device,
+            shape=(self.points, width),
+            dtype=self.module.float,
+        )
+        self._state_buffers = [
+            matrix(MIXED_VECTOR_DYNAMIC_WIDTH) for _ in range(4)
+        ]
+        self._rhs = matrix(MIXED_VECTOR_DYNAMIC_WIDTH)
+        self._vector_input = matrix(VECTOR_INPUT_WIDTH)
+        self._geometry: Any | None = None
+        self._matter_state: Any | None = None
+        self._primitive: Any | None = None
+        self._current_state = 0
+
+    @staticmethod
+    def _array(values: np.ndarray, shape: tuple[int, int], name: str):
+        array = np.asarray(values, dtype=np.float32)
+        if array.shape != shape or not np.all(np.isfinite(array)):
+            raise ValueError(f"{name} must be finite with shape {shape}")
+        return np.ascontiguousarray(array)
+
+    def _refresh_vector_input(self, dynamic: Any) -> None:
+        assert self._geometry is not None
+        nx, ny, nz = self.shape
+        self.module.theory33MixedVectorInputKernel(
+            point=self.grid,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            inverseDx=float(1.0 / self.spacing[0]),
+            inverseDy=float(1.0 / self.spacing[1]),
+            inverseDz=float(1.0 / self.spacing[2]),
+            dynamicState=dynamic,
+            geometryInput=self._geometry,
+            vectorInput=self._vector_input,
+        )
+
+    def initialize(
+        self,
+        dynamic_state: np.ndarray,
+        matter_state: np.ndarray,
+        primitive: np.ndarray,
+        geometry: np.ndarray,
+    ) -> VulkanMixedProcaState:
+        dynamic = self.spy.Tensor.from_numpy(
+            self.device,
+            self._array(
+                dynamic_state,
+                (self.points, MIXED_VECTOR_DYNAMIC_WIDTH),
+                "dynamic_state",
+            ),
+        )
+        self._state_buffers[0] = dynamic
+        self._matter_state = self.spy.Tensor.from_numpy(
+            self.device,
+            self._array(
+                matter_state,
+                (self.points, FULL_CARTER_STATE_WIDTH),
+                "matter_state",
+            ),
+        )
+        self._primitive = self.spy.Tensor.from_numpy(
+            self.device,
+            self._array(
+                primitive,
+                (self.points, PRIMITIVE_3D_WIDTH),
+                "primitive",
+            ),
+        )
+        self._geometry = self.spy.Tensor.from_numpy(
+            self.device,
+            self._array(
+                geometry,
+                (self.points, GEOMETRY_3D_WIDTH),
+                "geometry",
+            ),
+        )
+        self._current_state = 0
+        self._refresh_vector_input(dynamic)
+        return VulkanMixedProcaState(
+            tensor=dynamic,
+            vector_input=self._vector_input,
+            geometry=self._geometry,
+            matter_state=self._matter_state,
+            primitive=self._primitive,
+            shape=self.shape,
+        )
+
+    def _rhs_dispatch(self, dynamic: Any) -> None:
+        assert self._geometry is not None
+        assert self._matter_state is not None
+        assert self._primitive is not None
+        nx, ny, nz = self.shape
+        self.module.theory33MixedVectorRhsKernel(
+            point=self.grid,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            inverseDx=float(1.0 / self.spacing[0]),
+            inverseDy=float(1.0 / self.spacing[1]),
+            inverseDz=float(1.0 / self.spacing[2]),
+            cleaningDamping=self.cleaning_damping,
+            dynamicState=dynamic,
+            matterState=self._matter_state,
+            primitive=self._primitive,
+            geometryInput=self._geometry,
+            rhs=self._rhs,
+        )
+
+    def _stage(
+        self,
+        base: Any,
+        stage: Any,
+        output: Any,
+        dt: float,
+        base_weight: float,
+        evolved_weight: float,
+    ) -> None:
+        self.module.theory33MixedVectorStageKernel(
+            point=self.grid,
+            dt=float(dt),
+            baseWeight=float(base_weight),
+            evolvedWeight=float(evolved_weight),
+            baseState=base,
+            stageState=stage,
+            rhs=self._rhs,
+            output=output,
+        )
+
+    def step(
+        self, state: VulkanMixedProcaState, dt: float
+    ) -> VulkanMixedProcaState:
+        if dt <= 0.0 or not np.isfinite(dt):
+            raise ValueError("dt must be positive and finite")
+        base_index = self._current_state
+        first_index = (base_index + 1) % 4
+        second_index = (base_index + 2) % 4
+        final_index = (base_index + 3) % 4
+        base = self._state_buffers[base_index]
+        first = self._state_buffers[first_index]
+        second = self._state_buffers[second_index]
+        final = self._state_buffers[final_index]
+        self._rhs_dispatch(base)
+        self._stage(base, base, first, dt, 0.0, 1.0)
+        self._rhs_dispatch(first)
+        self._stage(base, first, second, dt, 0.75, 0.25)
+        self._rhs_dispatch(second)
+        self._stage(
+            base, second, final, dt, 1.0 / 3.0, 2.0 / 3.0
+        )
+        self._current_state = final_index
+        self._refresh_vector_input(final)
+        state.tensor = final
+        state.vector_input = self._vector_input
+        state.time += float(dt)
+        state.steps += 1
+        return state
+
+    def rhs(self, state: VulkanMixedProcaState) -> np.ndarray:
+        self._rhs_dispatch(state.tensor)
+        state.host_reads += 1
+        return self._rhs.to_numpy()
+
+    def snapshot(
+        self, state: VulkanMixedProcaState
+    ) -> VulkanMixedProcaSnapshot:
+        self._rhs_dispatch(state.tensor)
+        self._refresh_vector_input(state.tensor)
+        state.host_reads += 1
+        return VulkanMixedProcaSnapshot(
+            state=state.tensor.to_numpy(),
+            rhs=self._rhs.to_numpy(),
+            vector_input=self._vector_input.to_numpy(),
+            geometry=state.geometry.to_numpy(),
+            shape=state.shape,
+            time=state.time,
+            steps=state.steps,
+        )
 
 
 class VulkanTheory33SourceBackend:
@@ -1194,7 +1491,7 @@ class VulkanTheory33SourceBackend:
 
 
 class VulkanTheory33MultidimensionalBackend:
-    """Resident periodic multidimensional eleven-component Carter solver.
+    """Resident multidimensional eleven-component Carter solver.
 
     Grid indexing is x-fastest. Host arrays are flattened as ``(points,
     fields)``; ``shape`` is supplied as ``(nx, ny, nz)`` with inactive
@@ -1206,7 +1503,10 @@ class VulkanTheory33MultidimensionalBackend:
         shape: tuple[int, ...],
         *,
         lengths: tuple[float, ...] | None = None,
+        origins: tuple[float, ...] | None = None,
         constitutive_model: str = "analytic_m1",
+        reconstruction: str = "piecewise_constant",
+        boundary_mode: str = "periodic",
         relaxation_time: float = 0.01,
         module_path: str | Path | None = None,
     ) -> None:
@@ -1223,6 +1523,22 @@ class VulkanTheory33MultidimensionalBackend:
             raise ValueError("each active dimension needs at least four cells")
         if constitutive_model not in CONSTITUTIVE_MODES:
             raise ValueError("unknown constitutive model")
+        if boundary_mode not in BOUNDARY_MODES:
+            raise ValueError(
+                "boundary_mode must be 'periodic' or "
+                "'radiative_outflow'"
+            )
+        if boundary_mode == "radiative_outflow" and any(
+            value < 6 for value in expanded[: len(shape)]
+        ):
+            raise ValueError(
+                "radiative_outflow needs six cells per active axis"
+            )
+        if reconstruction not in FULL_RECONSTRUCTION_MODES:
+            raise ValueError(
+                "reconstruction must be 'piecewise_constant', "
+                "'full_carter_roe', or 'full_carter_weno5_z'"
+            )
         if relaxation_time <= 0.0:
             raise ValueError("relaxation_time must be positive")
         self.shape = expanded
@@ -1235,11 +1551,41 @@ class VulkanTheory33MultidimensionalBackend:
         self.lengths = tuple(float(v) for v in lengths) + (1.0,) * (
             3 - self.ndim
         )
+        if origins is None:
+            origins = tuple(-0.5 * value for value in lengths)
+        if len(origins) != self.ndim or any(
+            not np.isfinite(value) for value in origins
+        ):
+            raise ValueError("origins must match the active dimensions")
+        self.origins = tuple(float(v) for v in origins) + (0.0,) * (
+            3 - self.ndim
+        )
         self.spacing = tuple(
             self.lengths[axis] / self.shape[axis] for axis in range(3)
         )
         self.constitutive_model = constitutive_model
         self.model_mode = CONSTITUTIVE_MODES[constitutive_model]
+        self.reconstruction = reconstruction
+        self.reconstruction_mode = FULL_RECONSTRUCTION_MODES[
+            reconstruction
+        ]
+        self.boundary_mode = boundary_mode
+        self.boundary_mode_id = BOUNDARY_MODES[boundary_mode]
+        if (
+            boundary_mode == "radiative_outflow"
+            and reconstruction == "full_carter_weno5_z"
+        ):
+            raise ValueError(
+                "radiative_outflow currently supports piecewise_constant "
+                "and full_carter_roe reconstruction"
+            )
+        characteristic = reconstruction in {
+            "full_carter_roe",
+            "full_carter_weno5_z",
+        }
+        self.recovery_tolerance = 2.0e-6 if characteristic else 3.0e-5
+        self.recovery_step = 1.0e-3 if characteristic else 1.5e-3
+        self.phase_switch_tolerance = 4.0e-6 if characteristic else 0.0
         self.relaxation_time = float(relaxation_time)
         self.spy = _slangpy()
         root = Path(__file__).resolve().parents[1]
@@ -1278,6 +1624,14 @@ class VulkanTheory33MultidimensionalBackend:
         self._path = matrix(PRINCIPAL_PATH_WIDTH)
         self._speed = scalar()
         self._interface = matrix(11)
+        self._boundary_flux = matrix(11)
+        self._full_face_right = matrix(81)
+        self._full_face_left = matrix(81)
+        self._full_face_eigenvalues = matrix(9)
+        self._full_face_path = matrix(81)
+        self._full_face_entropy_modes = matrix(9)
+        self._full_face_transport_speed = scalar()
+        self._full_face_audit = matrix(FULL_EIGEN_AUDIT_WIDTH)
         self._specific_tracer = scalar()
         self._directional_rhs = [matrix(11) for _ in range(3)]
         self._rhs = matrix(11)
@@ -1372,6 +1726,9 @@ class VulkanTheory33MultidimensionalBackend:
         self.module.theory33FullRecoverCurvedKernel(
             point=self.grid,
             modelMode=self.model_mode,
+            recoveryTolerance=self.recovery_tolerance,
+            recoveryStep=self.recovery_step,
+            phaseSwitchTolerance=self.phase_switch_tolerance,
             state=state,
             geometryInput=self._geometry,
             vectorStress=self._vector_stress,
@@ -1395,6 +1752,9 @@ class VulkanTheory33MultidimensionalBackend:
         self.module.theory33FullRecoverCurvedKernel(
             point=self.grid,
             modelMode=self.model_mode,
+            recoveryTolerance=self.recovery_tolerance,
+            recoveryStep=self.recovery_step,
+            phaseSwitchTolerance=self.phase_switch_tolerance,
             state=state,
             geometryInput=self._geometry,
             vectorStress=self._vector_stress,
@@ -1402,6 +1762,31 @@ class VulkanTheory33MultidimensionalBackend:
             guessOutput=guess_output,
             diagnostics=self._diagnostic_buffers[1],
         )
+
+    def linearize_conserved_corridor(
+        self, state: VulkanTheory33MultidimensionalState
+    ) -> VulkanTheory33MultidimensionalState:
+        """Replace a 1D state by its resident straight conserved path."""
+        if self.ndim != 1:
+            raise ValueError("the conserved corridor is one-dimensional")
+        output = self._state_buffers[(self._current_state + 1) % 5]
+        primitive = self._primitive_buffers[
+            (self._current_primitive + 1) % 4
+        ]
+        self.module.theory33FullLinearCorridorKernel(
+            point=self.grid,
+            inputState=state.tensor,
+            outputState=output,
+        )
+        self._recover(output, state.primitive, primitive)
+        self._vector_stress_dispatch(primitive)
+        self._current_state = (self._current_state + 1) % 5
+        self._current_primitive = (self._current_primitive + 1) % 4
+        state.tensor = output
+        state.primitive = primitive
+        state.diagnostics = self._diagnostic_buffers[1]
+        state.vector_stress = self._vector_stress
+        return state
 
     def _rhs_dispatch(self, state: Any, primitive: Any) -> None:
         nx, ny, nz = self.shape
@@ -1424,6 +1809,18 @@ class VulkanTheory33MultidimensionalBackend:
                 pathData=self._path,
                 speed=self._speed,
             )
+            if self.boundary_mode_id == 1:
+                self.module.theory33FullOutflowBoundaryFluxKernel(
+                    point=self.grid,
+                    axis=axis,
+                    nx=nx,
+                    ny=ny,
+                    nz=nz,
+                    state=state,
+                    primitive=primitive,
+                    flux=self._flux,
+                    boundaryFlux=self._boundary_flux,
+                )
             self.module.theory33FullInterfaceKernel(
                 point=self.grid,
                 axis=axis,
@@ -1435,17 +1832,118 @@ class VulkanTheory33MultidimensionalBackend:
                 speed=self._speed,
                 interfaceFlux=self._interface,
             )
-            self.module.theory33FullDirectionalRhsKernel(
-                point=self.grid,
-                axis=axis,
-                nx=nx,
-                ny=ny,
-                nz=nz,
-                inverseSpacing=float(1.0 / self.spacing[axis]),
-                interfaceFlux=self._interface,
-                pathData=self._path,
-                rhs=target,
-            )
+            if self.reconstruction_mode in {1, 2}:
+                self.module.theory33FullFaceEigensystemKernel(
+                    point=self.grid,
+                    axis=axis,
+                    nx=nx,
+                    ny=ny,
+                    nz=nz,
+                    modelMode=self.model_mode,
+                    primitive=primitive,
+                    geometryInput=self._geometry,
+                    rightBasis=self._full_face_right,
+                    leftBasis=self._full_face_left,
+                    eigenvalues=self._full_face_eigenvalues,
+                    pathSymbol=self._full_face_path,
+                    entropyModes=self._full_face_entropy_modes,
+                    transportSpeed=self._full_face_transport_speed,
+                    audit=self._full_face_audit,
+                )
+                if self.reconstruction_mode == 1:
+                    self.module.theory33FullRoeInterfaceKernel(
+                        point=self.grid,
+                        axis=axis,
+                        nx=nx,
+                        ny=ny,
+                        nz=nz,
+                        state=state,
+                        flux=self._flux,
+                        speed=self._speed,
+                        rightBasis=self._full_face_right,
+                        leftBasis=self._full_face_left,
+                        eigenvalues=self._full_face_eigenvalues,
+                        entropyModes=self._full_face_entropy_modes,
+                        transportSpeed=self._full_face_transport_speed,
+                        interfaceFlux=self._interface,
+                    )
+                else:
+                    self.module.theory33FullCharacteristicInterfaceKernel(
+                        point=self.grid,
+                        axis=axis,
+                        nx=nx,
+                        ny=ny,
+                        nz=nz,
+                        state=state,
+                        flux=self._flux,
+                        speed=self._speed,
+                        rightBasis=self._full_face_right,
+                        leftBasis=self._full_face_left,
+                        entropyModes=self._full_face_entropy_modes,
+                        interfaceFlux=self._interface,
+                    )
+            if self.reconstruction_mode in {1, 2}:
+                if self.boundary_mode_id == 1:
+                    self.module.theory33FullRoeOutflowDirectionalRhsKernel(
+                        point=self.grid,
+                        axis=axis,
+                        nx=nx,
+                        ny=ny,
+                        nz=nz,
+                        inverseSpacing=float(
+                            1.0 / self.spacing[axis]
+                        ),
+                        state=state,
+                        interfaceFlux=self._interface,
+                        boundaryFlux=self._boundary_flux,
+                        pathSymbol=self._full_face_path,
+                        rhs=target,
+                    )
+                else:
+                    self.module.theory33FullRoeDirectionalRhsKernel(
+                        point=self.grid,
+                        axis=axis,
+                        nx=nx,
+                        ny=ny,
+                        nz=nz,
+                        inverseSpacing=float(
+                            1.0 / self.spacing[axis]
+                        ),
+                        state=state,
+                        interfaceFlux=self._interface,
+                        pathSymbol=self._full_face_path,
+                        rhs=target,
+                    )
+            else:
+                if self.boundary_mode_id == 1:
+                    self.module.theory33FullOutflowDirectionalRhsKernel(
+                        point=self.grid,
+                        axis=axis,
+                        nx=nx,
+                        ny=ny,
+                        nz=nz,
+                        inverseSpacing=float(
+                            1.0 / self.spacing[axis]
+                        ),
+                        interfaceFlux=self._interface,
+                        boundaryFlux=self._boundary_flux,
+                        pathData=self._path,
+                        rhs=target,
+                    )
+                else:
+                    self.module.theory33FullDirectionalRhsKernel(
+                        point=self.grid,
+                        axis=axis,
+                        nx=nx,
+                        ny=ny,
+                        nz=nz,
+                        inverseSpacing=float(
+                            1.0 / self.spacing[axis]
+                        ),
+                        interfaceFlux=self._interface,
+                        pathData=self._path,
+                        rhs=target,
+                    )
         self.module.theory33FullSumRhsKernel(
             point=self.grid,
             rhsX=self._directional_rhs[0],
@@ -1473,6 +1971,14 @@ class VulkanTheory33MultidimensionalBackend:
             stageState=stage,
             rhs=self._rhs,
             output=output,
+        )
+
+    def _project_entropy(self, state: Any, primitive: Any) -> None:
+        self.module.theory33FullProjectEntropyKernel(
+            point=self.grid,
+            primitive=primitive,
+            stateInput=state,
+            stateOutput=state,
         )
 
     def _drag_half_step(
@@ -1507,6 +2013,11 @@ class VulkanTheory33MultidimensionalBackend:
             geometryInput=self._geometry,
             vectorStress=self._vector_stress,
             state=output_state,
+        )
+        self.module.theory33FullConservativeDragCorrectKernel(
+            point=self.grid,
+            stateBefore=state,
+            stateAfter=output_state,
         )
 
     def step(
@@ -1561,6 +2072,7 @@ class VulkanTheory33MultidimensionalBackend:
             evolved_weight=1.0,
         )
         self._recover(first, primitive2, primitive3)
+        self._project_entropy(first, primitive3)
         self._vector_stress_dispatch(primitive3)
         self._rhs_dispatch(first, primitive3)
         self._stage(
@@ -1572,6 +2084,7 @@ class VulkanTheory33MultidimensionalBackend:
             evolved_weight=0.25,
         )
         self._recover(second, primitive3, primitive1)
+        self._project_entropy(second, primitive1)
         self._vector_stress_dispatch(primitive1)
         self._rhs_dispatch(second, primitive1)
         self._stage(
@@ -1583,6 +2096,7 @@ class VulkanTheory33MultidimensionalBackend:
             evolved_weight=2.0 / 3.0,
         )
         self._recover(final, primitive1, primitive2)
+        self._project_entropy(final, primitive2)
         result_state = final
         result_primitive = primitive2
         result_state_index = (state_index + 4) % 5
@@ -1626,6 +2140,91 @@ class VulkanTheory33MultidimensionalBackend:
             steps=state.steps,
         )
 
+    def save_checkpoint(
+        self,
+        state: VulkanTheory33MultidimensionalState,
+        path: str | Path,
+    ) -> Path:
+        """Write a restartable resident matter state."""
+        snapshot = self.snapshot(state)
+        target = Path(path)
+        np.savez_compressed(
+            target,
+            schema=np.array(
+                "vulkan-tesseract.multidimensional-checkpoint.v1"
+            ),
+            shape=np.asarray(self.shape, dtype=np.int64),
+            lengths=np.asarray(self.lengths, dtype=np.float64),
+            origins=np.asarray(self.origins, dtype=np.float64),
+            constitutive_model=np.array(self.constitutive_model),
+            reconstruction=np.array(self.reconstruction),
+            boundary_mode=np.array(self.boundary_mode),
+            relaxation_time=np.array(self.relaxation_time),
+            state=snapshot.state,
+            primitive=snapshot.primitive,
+            vector_input=self._vector_input.to_numpy(),
+            geometry=snapshot.geometry,
+            time=np.array(snapshot.time),
+            steps=np.array(snapshot.steps, dtype=np.int64),
+        )
+        return target
+
+    def load_checkpoint(
+        self, path: str | Path
+    ) -> VulkanTheory33MultidimensionalState:
+        """Restore a checkpoint and re-audit primitive recovery on-device."""
+        with np.load(Path(path), allow_pickle=False) as checkpoint:
+            schema = str(checkpoint["schema"])
+            if schema != "vulkan-tesseract.multidimensional-checkpoint.v1":
+                raise ValueError(f"unsupported checkpoint schema {schema!r}")
+            if tuple(checkpoint["shape"].tolist()) != self.shape:
+                raise ValueError("checkpoint grid shape does not match backend")
+            if str(checkpoint["constitutive_model"]) != self.constitutive_model:
+                raise ValueError("checkpoint constitutive model does not match")
+            if str(checkpoint["reconstruction"]) != self.reconstruction:
+                raise ValueError("checkpoint reconstruction does not match")
+            if (
+                "boundary_mode" in checkpoint
+                and str(checkpoint["boundary_mode"]) != self.boundary_mode
+            ):
+                raise ValueError("checkpoint boundary mode does not match")
+            conserved = np.asarray(checkpoint["state"], dtype=np.float32)
+            primitive = np.asarray(
+                checkpoint["primitive"], dtype=np.float32
+            )
+            vector_input = np.asarray(
+                checkpoint["vector_input"], dtype=np.float32
+            )
+            geometry = np.asarray(
+                checkpoint["geometry"], dtype=np.float32
+            )
+            time = float(checkpoint["time"])
+            steps = int(checkpoint["steps"])
+        tracer = conserved[:, 10] / np.maximum(
+            conserved[:, 0], np.float32(1.0e-12)
+        )
+        restored = self.initialize(
+            primitive, vector_input, geometry, tracer
+        )
+        uploaded = self.spy.Tensor.from_numpy(self.device, conserved)
+        self._state_buffers[0] = uploaded
+        self._current_state = 0
+        recovered_index = (self._current_primitive + 1) % 4
+        self._recover(
+            uploaded,
+            restored.primitive,
+            self._primitive_buffers[recovered_index],
+        )
+        self._current_primitive = recovered_index
+        restored.tensor = uploaded
+        restored.primitive = self._primitive_buffers[recovered_index]
+        restored.diagnostics = self._diagnostic_buffers[1]
+        self._vector_stress_dispatch(restored.primitive)
+        restored.vector_stress = self._vector_stress
+        restored.time = time
+        restored.steps = steps
+        return restored
+
 
 class VulkanTesseractCoupledBackend(
     VulkanTheory33MultidimensionalBackend
@@ -1642,7 +2241,10 @@ class VulkanTesseractCoupledBackend(
         shape: tuple[int, ...],
         *,
         lengths: tuple[float, ...] | None = None,
+        origins: tuple[float, ...] | None = None,
         constitutive_model: str = "analytic_m1",
+        reconstruction: str = "piecewise_constant",
+        boundary_mode: str = "periodic",
         relaxation_time: float = 0.01,
         kappa_gravity: float = 8.0 * np.pi,
         kappa1: float = 0.1,
@@ -1653,12 +2255,16 @@ class VulkanTesseractCoupledBackend(
         eta_shift: float = 1.0,
         slicing: str = "1+log",
         evolve_shift: bool = True,
+        derivative_order: int = 2,
         module_path: str | Path | None = None,
     ) -> None:
         super().__init__(
             shape,
             lengths=lengths,
+            origins=origins,
             constitutive_model=constitutive_model,
+            reconstruction=reconstruction,
+            boundary_mode=boundary_mode,
             relaxation_time=relaxation_time,
             module_path=module_path,
         )
@@ -1672,6 +2278,14 @@ class VulkanTesseractCoupledBackend(
             raise ValueError("invalid shift parameters")
         if slicing not in {"1+log", "harmonic"}:
             raise ValueError("slicing must be '1+log' or 'harmonic'")
+        if derivative_order not in {2, 4}:
+            raise ValueError("derivative_order must be 2 or 4")
+        if derivative_order == 4 and any(
+            value < 8 for value in self.shape[: self.ndim]
+        ):
+            raise ValueError(
+                "fourth-order CCZ4 derivatives need eight cells per axis"
+            )
         self.kappa_gravity = float(kappa_gravity)
         self.kappa1 = float(kappa1)
         self.kappa2 = float(kappa2)
@@ -1681,6 +2295,7 @@ class VulkanTesseractCoupledBackend(
         self.eta_shift = float(eta_shift)
         self.slicing_mode = 0 if slicing == "1+log" else 1
         self.evolve_shift = int(evolve_shift)
+        self.derivative_order = int(derivative_order)
         tensor = self.spy.Tensor.empty
         matrix = lambda width: tensor(
             self.device,
@@ -1808,6 +2423,7 @@ class VulkanTesseractCoupledBackend(
             inverseDx=float(1.0 / self.spacing[0]),
             inverseDy=float(1.0 / self.spacing[1]),
             inverseDz=float(1.0 / self.spacing[2]),
+            derivativeOrder=self.derivative_order,
             kappa1=self.kappa1,
             kappa2=self.kappa2,
             kappa3=self.kappa3,
@@ -1832,6 +2448,23 @@ class VulkanTesseractCoupledBackend(
             matterRhs=self._ccz4_matter_rhs,
             rhs=self._ccz4_rhs,
         )
+        if self.boundary_mode_id == 1:
+            self.module.theory33CCZ4RadiativeBoundaryKernel(
+                point=self.grid,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                originX=self.origins[0],
+                originY=self.origins[1],
+                originZ=self.origins[2],
+                derivativeOrder=self.derivative_order,
+                constraintDamping=1.0,
+                state=ccz4_state,
+                rhs=self._ccz4_rhs,
+            )
         return second_index
 
     def _advance_ccz4(
@@ -1957,6 +2590,977 @@ class VulkanTesseractCoupledBackend(
             time=state.time,
             steps=state.steps,
         )
+
+    def save_checkpoint(
+        self,
+        state: VulkanTesseractCoupledState,
+        path: str | Path,
+    ) -> Path:
+        """Write a restartable coupled Carter/CCZ4 state."""
+        snapshot = self.snapshot(state)
+        target = Path(path)
+        np.savez_compressed(
+            target,
+            schema=np.array("vulkan-tesseract.coupled-checkpoint.v1"),
+            shape=np.asarray(self.shape, dtype=np.int64),
+            lengths=np.asarray(self.lengths, dtype=np.float64),
+            origins=np.asarray(self.origins, dtype=np.float64),
+            constitutive_model=np.array(self.constitutive_model),
+            reconstruction=np.array(self.reconstruction),
+            boundary_mode=np.array(self.boundary_mode),
+            derivative_order=np.array(
+                self.derivative_order, dtype=np.int64
+            ),
+            relaxation_time=np.array(self.relaxation_time),
+            matter_state=snapshot.matter.state,
+            primitive=snapshot.matter.primitive,
+            vector_input=self._vector_input.to_numpy(),
+            ccz4_state=snapshot.ccz4_state,
+            time=np.array(snapshot.time),
+            steps=np.array(snapshot.steps, dtype=np.int64),
+        )
+        return target
+
+    def load_checkpoint(
+        self, path: str | Path
+    ) -> VulkanTesseractCoupledState:
+        """Restore coupled fields and repeat projection/recovery audits."""
+        with np.load(Path(path), allow_pickle=False) as checkpoint:
+            schema = str(checkpoint["schema"])
+            if schema != "vulkan-tesseract.coupled-checkpoint.v1":
+                raise ValueError(f"unsupported checkpoint schema {schema!r}")
+            if tuple(checkpoint["shape"].tolist()) != self.shape:
+                raise ValueError("checkpoint grid shape does not match backend")
+            if str(checkpoint["constitutive_model"]) != self.constitutive_model:
+                raise ValueError("checkpoint constitutive model does not match")
+            if str(checkpoint["reconstruction"]) != self.reconstruction:
+                raise ValueError("checkpoint reconstruction does not match")
+            if (
+                "boundary_mode" in checkpoint
+                and str(checkpoint["boundary_mode"]) != self.boundary_mode
+            ):
+                raise ValueError("checkpoint boundary mode does not match")
+            if (
+                "derivative_order" in checkpoint
+                and int(checkpoint["derivative_order"])
+                != self.derivative_order
+            ):
+                raise ValueError(
+                    "checkpoint derivative order does not match"
+                )
+            conserved = np.asarray(
+                checkpoint["matter_state"], dtype=np.float32
+            )
+            primitive = np.asarray(
+                checkpoint["primitive"], dtype=np.float32
+            )
+            vector_input = np.asarray(
+                checkpoint["vector_input"], dtype=np.float32
+            )
+            ccz4 = np.asarray(
+                checkpoint["ccz4_state"], dtype=np.float32
+            )
+            time = float(checkpoint["time"])
+            steps = int(checkpoint["steps"])
+        tracer = conserved[:, 10] / np.maximum(
+            conserved[:, 0], np.float32(1.0e-12)
+        )
+        restored = self.initialize(
+            primitive, vector_input, ccz4, tracer
+        )
+        uploaded = self.spy.Tensor.from_numpy(self.device, conserved)
+        self._state_buffers[0] = uploaded
+        self._current_state = 0
+        recovered_index = (self._current_primitive + 1) % 4
+        self._recover(
+            uploaded,
+            restored.matter.primitive,
+            self._primitive_buffers[recovered_index],
+        )
+        self._current_primitive = recovered_index
+        restored.matter.tensor = uploaded
+        restored.matter.primitive = self._primitive_buffers[recovered_index]
+        restored.matter.diagnostics = self._diagnostic_buffers[1]
+        self._vector_stress_dispatch(restored.matter.primitive)
+        restored.matter.vector_stress = self._vector_stress
+        restored.matter.time = time
+        restored.matter.steps = steps
+        restored.time = time
+        restored.steps = steps
+        return restored
+
+
+class VulkanTesseractEvolvedBackend(VulkanTesseractCoupledBackend):
+    """Coupled Carter/CCZ4 engine with resident evolved mixed-Proca state."""
+
+    def __init__(
+        self,
+        shape: tuple[int, ...],
+        *,
+        vector_cleaning_damping: float = 1.0,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(shape, **kwargs)
+        if vector_cleaning_damping < 0.0:
+            raise ValueError("vector cleaning damping must be nonnegative")
+        self.vector_cleaning_damping = float(vector_cleaning_damping)
+        tensor = self.spy.Tensor.empty
+        matrix = lambda width: tensor(
+            self.device,
+            shape=(self.points, width),
+            dtype=self.module.float,
+        )
+        self._vector_dynamic_buffers = [
+            matrix(MIXED_VECTOR_DYNAMIC_WIDTH) for _ in range(4)
+        ]
+        self._vector_dynamic_rhs = matrix(MIXED_VECTOR_DYNAMIC_WIDTH)
+        self._vector_boundary_projected_rhs = matrix(
+            MIXED_VECTOR_DYNAMIC_WIDTH
+        )
+        self._vector_boundary_final_rhs = matrix(
+            MIXED_VECTOR_DYNAMIC_WIDTH
+        )
+        self._previous_vector_stress = matrix(VECTOR_STRESS_WIDTH)
+        self._current_vector_dynamic = 0
+        cmc_matrix = lambda width: tensor(
+            self.device,
+            shape=(self.points, width),
+            dtype=self.module.float,
+        )
+        self._cmc_buffers = [cmc_matrix(4), cmc_matrix(4)]
+        self._cmc_candidate = cmc_matrix(4)
+        self._cmc_residual = cmc_matrix(2)
+        self._cmc_control = tensor(
+            self.device, shape=(1, 12), dtype=self.module.float
+        )
+        self._cmc_stored_source = matrix(4)
+        self._counterflow_audit = matrix(3)
+        self._scalar_grid = self.spy.grid(shape=(1,))
+        self._current_cmc = 0
+        # The constrained-data solve uses explicit raw-buffer fp64 kernels in
+        # every active dimension.  SlangPy's ITensor<double> binder is not
+        # reliable on all Windows Vulkan drivers, but raw fp64 storage buffers
+        # are; the evolved CCZ4/matter ABI remains float32.
+        self._cmc_fp64 = True
+        self._cmc64_kernels: dict[str, Any] = {}
+        self._cmc64_buffers: list[Any] = []
+        self._cmc64_candidate: Any | None = None
+        self._cmc64_residual: Any | None = None
+        self._cmc64_control: Any | None = None
+        if self._cmc_fp64:
+            cmc_module_path = (
+                Path(__file__).resolve().parents[1]
+                / "tesseract_cmc_fp64.slang"
+            )
+            entry_points = {
+                "trace": "theory33CMCTrace64Kernel",
+                "update": "theory33CMCUpdate64Kernel",
+                "mean": "theory33CMCMean64Kernel",
+                "normalize": "theory33CMCNormalize64Kernel",
+                "residual": "theory33CMCResidual64Kernel",
+                "reduce": "theory33CMCReduce64Kernel",
+                "pack": "theory33CMCPack64Kernel",
+            }
+            for key, entry_point in entry_points.items():
+                program = self.device.load_program(
+                    module_name=str(cmc_module_path),
+                    entry_point_names=[entry_point],
+                )
+                self._cmc64_kernels[key] = (
+                    self.device.create_compute_kernel(program=program)
+                )
+            usage = (
+                self.spy.BufferUsage.shader_resource
+                | self.spy.BufferUsage.unordered_access
+            )
+            self._cmc64_buffers = [
+                self.device.create_buffer(
+                    element_count=self.points * 4,
+                    struct_size=8,
+                    usage=usage,
+                )
+                for _ in range(2)
+            ]
+            self._cmc64_candidate = self.device.create_buffer(
+                element_count=self.points * 4,
+                struct_size=8,
+                usage=usage,
+            )
+            self._cmc64_residual = self.device.create_buffer(
+                element_count=self.points * 2,
+                struct_size=8,
+                usage=usage,
+            )
+            self._cmc64_control = self.device.create_buffer(
+                element_count=12,
+                struct_size=8,
+                usage=usage,
+            )
+
+    def _refresh_evolved_vector_input(self, dynamic: Any) -> None:
+        nx, ny, nz = self.shape
+        self.module.theory33MixedVectorInputKernel(
+            point=self.grid,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            inverseDx=float(1.0 / self.spacing[0]),
+            inverseDy=float(1.0 / self.spacing[1]),
+            inverseDz=float(1.0 / self.spacing[2]),
+            dynamicState=dynamic,
+            geometryInput=self._geometry,
+            vectorInput=self._vector_input,
+        )
+
+    def initialize(
+        self,
+        primitive: np.ndarray,
+        vector_dynamic: np.ndarray,
+        ccz4_state: np.ndarray,
+        tracer: np.ndarray,
+    ) -> VulkanTesseractCoupledState:
+        dynamic_values = VulkanMixedProcaBackend._array(
+            vector_dynamic,
+            (self.points, MIXED_VECTOR_DYNAMIC_WIDTH),
+            "vector_dynamic",
+        )
+        vector_input = np.zeros(
+            (self.points, VECTOR_INPUT_WIDTH), dtype=np.float32
+        )
+        vector_input[:, :14] = dynamic_values[:, :14]
+        state = super().initialize(
+            primitive, vector_input, ccz4_state, tracer
+        )
+        dynamic = self.spy.Tensor.from_numpy(
+            self.device, dynamic_values
+        )
+        self._vector_dynamic_buffers[0] = dynamic
+        self._current_vector_dynamic = 0
+        self._refresh_evolved_vector_input(dynamic)
+        self._vector_stress_dispatch(state.matter.primitive)
+        output_index = (self._current_state + 1) % 5
+        self.module.theory33FullExtractTracerKernel(
+            point=self.grid,
+            state=state.matter.tensor,
+            tracer=self._specific_tracer,
+        )
+        self.module.theory33FullComposeCurvedKernel(
+            point=self.grid,
+            modelMode=self.model_mode,
+            primitive=state.matter.primitive,
+            tracer=self._specific_tracer,
+            geometryInput=self._geometry,
+            vectorStress=self._vector_stress,
+            state=self._state_buffers[output_index],
+        )
+        self._current_state = output_index
+        state.matter.tensor = self._state_buffers[output_index]
+        return state
+
+    def _balanced_counterflow_dispatch(
+        self,
+        state: VulkanTesseractCoupledState,
+    ) -> None:
+        """Generate the original active counterflow and refresh its stress."""
+        output_index = (self._current_primitive + 1) % 4
+        primitive = self._primitive_buffers[output_index]
+        nx, ny, nz = self.shape
+        self.module.theory33BalancedCounterflowKernel(
+            point=self.grid,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            modelMode=self.model_mode,
+            geometryInput=self._geometry,
+            primitive=primitive,
+            audit=self._counterflow_audit,
+        )
+        self._current_primitive = output_index
+        state.matter.primitive = primitive
+        dynamic = self._vector_dynamic_buffers[
+            self._current_vector_dynamic
+        ]
+        self._refresh_evolved_vector_input(dynamic)
+        self._vector_stress_dispatch(primitive)
+        state_index = (self._current_state + 1) % 5
+        self.module.theory33FullComposeCurvedKernel(
+            point=self.grid,
+            modelMode=self.model_mode,
+            primitive=primitive,
+            tracer=self._tracer,
+            geometryInput=self._geometry,
+            vectorStress=self._vector_stress,
+            state=self._state_buffers[state_index],
+        )
+        self._current_state = state_index
+        state.matter.tensor = self._state_buffers[state_index]
+        recovered_index = (self._current_primitive + 1) % 4
+        self._recover(
+            state.matter.tensor,
+            primitive,
+            self._primitive_buffers[recovered_index],
+        )
+        self._current_primitive = recovered_index
+        state.matter.primitive = self._primitive_buffers[recovered_index]
+        state.matter.diagnostics = self._diagnostic_buffers[1]
+        self._vector_stress_dispatch(state.matter.primitive)
+        self.module.theory33FullMatterStressKernel(
+            point=self.grid,
+            modelMode=self.model_mode,
+            primitive=state.matter.primitive,
+            geometryInput=self._geometry,
+            vectorStress=self._vector_stress,
+            matterStress=self._matter_stress,
+        )
+        state.matter.vector_stress = self._vector_stress
+        state.matter.geometry = self._geometry
+
+    def _cmc_trace(self, expanding: bool) -> None:
+        if self._cmc_fp64:
+            assert self._cmc64_control is not None
+            nx, ny, nz = self.shape
+            self._cmc64_kernels["trace"].dispatch(
+                thread_count=[1, 1, 1],
+                numberPoints=self.points,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                kappaGravity=self.kappa_gravity,
+                expanding=int(expanding),
+                state=self._cmc64_buffers[self._current_cmc],
+                matterStress=self._matter_stress.storage,
+                control=self._cmc64_control,
+            )
+            return
+        nx, ny, nz = self.shape
+        state = self._cmc_buffers[self._current_cmc]
+        self.module.theory33CMCTraceKernel(
+            point=self._scalar_grid,
+            numberPoints=self.points,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            inverseDx=float(1.0 / self.spacing[0]),
+            inverseDy=float(1.0 / self.spacing[1]),
+            inverseDz=float(1.0 / self.spacing[2]),
+            kappaGravity=self.kappa_gravity,
+            expanding=int(expanding),
+            state=state,
+            matterStress=self._matter_stress,
+            control=self._cmc_control,
+        )
+
+    def _cmc_audit(self, expanding: bool) -> np.ndarray:
+        if self._cmc_fp64:
+            assert self._cmc64_control is not None
+            assert self._cmc64_residual is not None
+            nx, ny, nz = self.shape
+            self._cmc_trace(expanding)
+            self._cmc64_kernels["residual"].dispatch(
+                thread_count=[self.points, 1, 1],
+                numberPoints=self.points,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                kappaGravity=self.kappa_gravity,
+                state=self._cmc64_buffers[self._current_cmc],
+                matterStress=self._matter_stress.storage,
+                control=self._cmc64_control,
+                residual=self._cmc64_residual,
+            )
+            self._cmc64_kernels["reduce"].dispatch(
+                thread_count=[1, 1, 1],
+                numberPoints=self.points,
+                state=self._cmc64_buffers[self._current_cmc],
+                residual=self._cmc64_residual,
+                control=self._cmc64_control,
+            )
+            return self._cmc64_control.to_numpy().view(np.float64)
+        nx, ny, nz = self.shape
+        self._cmc_trace(expanding)
+        state = self._cmc_buffers[self._current_cmc]
+        self.module.theory33CMCResidualKernel(
+            point=self.grid,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            inverseDx=float(1.0 / self.spacing[0]),
+            inverseDy=float(1.0 / self.spacing[1]),
+            inverseDz=float(1.0 / self.spacing[2]),
+            kappaGravity=self.kappa_gravity,
+            state=state,
+            matterStress=self._matter_stress,
+            control=self._cmc_control,
+            residual=self._cmc_residual,
+        )
+        self.module.theory33CMCReduceResidualKernel(
+            point=self._scalar_grid,
+            numberPoints=self.points,
+            state=state,
+            residual=self._cmc_residual,
+            control=self._cmc_control,
+        )
+        return self._cmc_control.to_numpy()[0]
+
+    def _solve_periodic_cmc(
+        self,
+        *,
+        tolerance: float,
+        maximum_iterations: int,
+        relaxation: float,
+        report_interval: int,
+        expanding: bool,
+    ) -> tuple[np.ndarray, int, int, bool]:
+        nx, ny, nz = self.shape
+        active_dimensions = self.ndim
+        pseudo_dt = (
+            relaxation
+            * min(self.spacing[:active_dimensions]) ** 2
+            / (2.0 * active_dimensions)
+        )
+        scalar_readbacks = 0
+        converged = False
+        control = np.full(12, np.nan)
+        for iteration in range(1, maximum_iterations + 1):
+            self._cmc_trace(expanding)
+            if self._cmc_fp64:
+                assert self._cmc64_candidate is not None
+                assert self._cmc64_control is not None
+                source64 = self._cmc64_buffers[self._current_cmc]
+                target_index = 1 - self._current_cmc
+                target64 = self._cmc64_buffers[target_index]
+                self._cmc64_kernels["update"].dispatch(
+                    thread_count=[self.points, 1, 1],
+                    numberPoints=self.points,
+                    nx=nx,
+                    ny=ny,
+                    nz=nz,
+                    inverseDx=float(1.0 / self.spacing[0]),
+                    inverseDy=float(1.0 / self.spacing[1]),
+                    inverseDz=float(1.0 / self.spacing[2]),
+                    kappaGravity=self.kappa_gravity,
+                    pseudoTimeStep=pseudo_dt,
+                    minimumConformalFactor=0.1,
+                    maximumConformalFactor=20.0,
+                    state=source64,
+                    matterStress=self._matter_stress.storage,
+                    control=self._cmc64_control,
+                    candidate=self._cmc64_candidate,
+                )
+                self._cmc64_kernels["mean"].dispatch(
+                    thread_count=[1, 1, 1],
+                    numberPoints=self.points,
+                    candidate=self._cmc64_candidate,
+                    control=self._cmc64_control,
+                )
+                self._cmc64_kernels["normalize"].dispatch(
+                    thread_count=[self.points, 1, 1],
+                    numberPoints=self.points,
+                    candidate=self._cmc64_candidate,
+                    control=self._cmc64_control,
+                    state=target64,
+                )
+                self._current_cmc = target_index
+            else:
+                source = self._cmc_buffers[self._current_cmc]
+                target_index = 1 - self._current_cmc
+                target = self._cmc_buffers[target_index]
+                self.module.theory33CMCUpdateKernel(
+                    point=self.grid,
+                    nx=nx,
+                    ny=ny,
+                    nz=nz,
+                    inverseDx=float(1.0 / self.spacing[0]),
+                    inverseDy=float(1.0 / self.spacing[1]),
+                    inverseDz=float(1.0 / self.spacing[2]),
+                    kappaGravity=self.kappa_gravity,
+                    pseudoTimeStep=pseudo_dt,
+                    minimumConformalFactor=0.1,
+                    maximumConformalFactor=20.0,
+                    state=source,
+                    matterStress=self._matter_stress,
+                    control=self._cmc_control,
+                    candidate=self._cmc_candidate,
+                )
+                self.module.theory33CMCMeanKernel(
+                    point=self._scalar_grid,
+                    numberPoints=self.points,
+                    candidate=self._cmc_candidate,
+                    control=self._cmc_control,
+                )
+                self.module.theory33CMCNormalizeKernel(
+                    point=self.grid,
+                    candidate=self._cmc_candidate,
+                    control=self._cmc_control,
+                    state=target,
+                )
+                self._current_cmc = target_index
+            if iteration == 1 or iteration % report_interval == 0:
+                control = self._cmc_audit(expanding)
+                scalar_readbacks += 1
+                if (
+                    np.isfinite(control[6:10]).all()
+                    and max(float(control[6]), float(control[7]))
+                    <= tolerance
+                ):
+                    converged = True
+                    break
+                if (
+                    not np.isfinite(control[8:10]).all()
+                    or float(control[9]) > 20.0
+                ):
+                    break
+        if not np.isfinite(control[6:10]).all():
+            control = self._cmc_audit(expanding)
+            scalar_readbacks += 1
+        return control, iteration, scalar_readbacks, converged
+
+    def _pack_cmc_geometry(
+        self,
+        state: VulkanTesseractCoupledState,
+    ) -> None:
+        nx, ny, nz = self.shape
+        raw_index = (self._current_ccz4 + 1) % 8
+        projected_index = (self._current_ccz4 + 2) % 8
+        if self._cmc_fp64:
+            assert self._cmc64_control is not None
+            self._cmc64_kernels["pack"].dispatch(
+                thread_count=[self.points, 1, 1],
+                numberPoints=self.points,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                state=self._cmc64_buffers[self._current_cmc],
+                control=self._cmc64_control,
+                ccz4State=self._ccz4_buffers[raw_index].storage,
+            )
+        else:
+            self.module.theory33CMCPackCCZ4Kernel(
+                point=self.grid,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                state=self._cmc_buffers[self._current_cmc],
+                control=self._cmc_control,
+                ccz4State=self._ccz4_buffers[raw_index],
+            )
+        self._project_ccz4(
+            self._ccz4_buffers[raw_index],
+            self._ccz4_buffers[projected_index],
+        )
+        self._current_ccz4 = projected_index
+        state.ccz4 = self._ccz4_buffers[projected_index]
+        self._set_geometry(state.ccz4)
+        state.matter.geometry = self._geometry
+
+    def initialize_constrained(
+        self,
+        *,
+        picard_iterations: int = 3,
+        elliptic_tolerance: float = 2.0e-8,
+        maximum_iterations: int = 9000,
+        relaxation: float = 0.3,
+        report_interval: int = 20,
+        expanding: bool = False,
+    ) -> tuple[VulkanTesseractCoupledState, VulkanPeriodicCMCReport]:
+        """Construct the original active periodic CMC state on Vulkan.
+
+        Field construction, the counterflow root, elliptic updates, global
+        CMC zero mode, normalization, and CCZ4 packing all execute on the
+        device.  Only the two convergence norms are read at report events.
+        """
+        if picard_iterations < 2:
+            raise ValueError(
+                "at least two matter/geometry Picard iterations are required"
+            )
+        if elliptic_tolerance <= 0.0 or maximum_iterations < 1:
+            raise ValueError("invalid periodic CMC controls")
+        primitive = np.zeros(
+            (self.points, PRIMITIVE_3D_WIDTH), dtype=np.float32
+        )
+        dynamic = np.zeros(
+            (self.points, MIXED_VECTOR_DYNAMIC_WIDTH), dtype=np.float32
+        )
+        ccz4 = np.zeros(
+            (self.points, CCZ4_STATE_WIDTH), dtype=np.float32
+        )
+        for axis in range(3):
+            ccz4[:, axis * 3 + axis] = 1.0
+        ccz4[:, 18] = 1.0
+        ccz4[:, 24] = 1.0
+        tracer = np.zeros(self.points, dtype=np.float32)
+        state = self.initialize(primitive, dynamic, ccz4, tracer)
+        cmc_initial = np.zeros(
+            (self.points, 4),
+            dtype=np.float64 if self._cmc_fp64 else np.float32,
+        )
+        cmc_initial[:, 0] = 1.0
+        if self._cmc_fp64:
+            usage = (
+                self.spy.BufferUsage.shader_resource
+                | self.spy.BufferUsage.unordered_access
+            )
+            self._cmc64_buffers[0] = self.device.create_buffer(
+                element_count=self.points * 4,
+                struct_size=8,
+                usage=usage,
+                data=cmc_initial.reshape(-1),
+            )
+        else:
+            self._cmc_buffers[0] = self.spy.Tensor.from_numpy(
+                self.device, cmc_initial
+            )
+        self._current_cmc = 0
+        scalar_readbacks = 0
+        control = np.full(12, np.nan)
+        latest_iterations = 0
+        latest_converged = False
+        source_change = np.inf
+        momentum_balance = np.inf
+        for picard in range(picard_iterations):
+            self._balanced_counterflow_dispatch(state)
+            self.module.theory33CounterflowAuditReduceKernel(
+                point=self._scalar_grid,
+                numberPoints=self.points,
+                audit=self._counterflow_audit,
+                control=self._cmc_control,
+            )
+            if picard > 0:
+                self.module.theory33CMCSourceChangeKernel(
+                    point=self._scalar_grid,
+                    numberPoints=self.points,
+                    matterStress=self._matter_stress,
+                    storedSource=self._cmc_stored_source,
+                    control=self._cmc_control,
+                )
+            self.module.theory33CMCStoreSourceKernel(
+                point=self.grid,
+                matterStress=self._matter_stress,
+                storedSource=self._cmc_stored_source,
+            )
+            balance_control = self._cmc_control.to_numpy()[0]
+            scalar_readbacks += 1
+            momentum_balance = float(balance_control[11])
+            if picard > 0:
+                source_change = float(balance_control[10])
+            control, latest_iterations, reads, latest_converged = (
+                self._solve_periodic_cmc(
+                    tolerance=elliptic_tolerance,
+                    maximum_iterations=maximum_iterations,
+                    relaxation=relaxation,
+                    report_interval=report_interval,
+                    expanding=expanding,
+                )
+            )
+            scalar_readbacks += reads
+            if not latest_converged:
+                break
+            self._pack_cmc_geometry(state)
+
+        self._balanced_counterflow_dispatch(state)
+        self.module.theory33CounterflowAuditReduceKernel(
+            point=self._scalar_grid,
+            numberPoints=self.points,
+            audit=self._counterflow_audit,
+            control=self._cmc_control,
+        )
+        balance_control = self._cmc_control.to_numpy()[0]
+        scalar_readbacks += 1
+        momentum_balance = float(balance_control[11])
+        control = self._cmc_audit(expanding)
+        scalar_readbacks += 1
+        report = VulkanPeriodicCMCReport(
+            converged=(
+                latest_converged
+                and float(control[6]) <= 1.1 * elliptic_tolerance
+                and float(control[7]) <= 1.1 * elliptic_tolerance
+            ),
+            iterations=latest_iterations,
+            picard_iterations=picard_iterations,
+            hamiltonian_residual_l2=float(control[6]),
+            momentum_residual_l2=float(control[7]),
+            trace_K=float(control[1]),
+            minimum_conformal_factor=float(control[8]),
+            maximum_conformal_factor=float(control[9]),
+            pointwise_momentum_balance=momentum_balance,
+            final_source_relative_change=float(source_change),
+            scalar_readbacks=scalar_readbacks,
+        )
+        return state, report
+
+    def _vector_rhs_dispatch(
+        self,
+        dynamic: Any,
+        matter: VulkanTheory33MultidimensionalState,
+    ) -> None:
+        nx, ny, nz = self.shape
+        self.module.theory33MixedVectorRhsKernel(
+            point=self.grid,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            inverseDx=float(1.0 / self.spacing[0]),
+            inverseDy=float(1.0 / self.spacing[1]),
+            inverseDz=float(1.0 / self.spacing[2]),
+            cleaningDamping=self.vector_cleaning_damping,
+            dynamicState=dynamic,
+            matterState=matter.tensor,
+            primitive=matter.primitive,
+            geometryInput=self._geometry,
+            rhs=self._vector_dynamic_rhs,
+        )
+        if self.boundary_mode_id == 1:
+            self.module.theory33VectorRadiativeBoundaryKernel(
+                point=self.grid,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                originX=self.origins[0],
+                originY=self.origins[1],
+                originZ=self.origins[2],
+                derivativeOrder=self.derivative_order,
+                state=dynamic,
+                rawRhs=self._vector_dynamic_rhs,
+                projectedRhs=self._vector_boundary_projected_rhs,
+            )
+            self.module.theory33VectorGaussBoundaryKernel(
+                point=self.grid,
+                nx=nx,
+                ny=ny,
+                nz=nz,
+                inverseDx=float(1.0 / self.spacing[0]),
+                inverseDy=float(1.0 / self.spacing[1]),
+                inverseDz=float(1.0 / self.spacing[2]),
+                derivativeOrder=self.derivative_order,
+                ZA=1.0,
+                ZB=1.0,
+                rawRhs=self._vector_dynamic_rhs,
+                projectedRhs=self._vector_boundary_projected_rhs,
+                finalRhs=self._vector_boundary_final_rhs,
+            )
+
+    def _vector_stage(
+        self,
+        base: Any,
+        stage: Any,
+        output: Any,
+        dt: float,
+        base_weight: float,
+        evolved_weight: float,
+    ) -> None:
+        self.module.theory33MixedVectorStageKernel(
+            point=self.grid,
+            dt=float(dt),
+            baseWeight=float(base_weight),
+            evolvedWeight=float(evolved_weight),
+            baseState=base,
+            stageState=stage,
+            rhs=(
+                self._vector_boundary_final_rhs
+                if self.boundary_mode_id == 1
+                else self._vector_dynamic_rhs
+            ),
+            output=output,
+        )
+
+    def _advance_vectors(
+        self,
+        state: VulkanTesseractCoupledState,
+        dt: float,
+    ) -> None:
+        base_index = self._current_vector_dynamic
+        first_index = (base_index + 1) % 4
+        second_index = (base_index + 2) % 4
+        final_index = (base_index + 3) % 4
+        base = self._vector_dynamic_buffers[base_index]
+        first = self._vector_dynamic_buffers[first_index]
+        second = self._vector_dynamic_buffers[second_index]
+        final = self._vector_dynamic_buffers[final_index]
+        self.module.theory33CopyVectorStressKernel(
+            point=self.grid,
+            source=self._vector_stress,
+            target=self._previous_vector_stress,
+        )
+        self._vector_rhs_dispatch(base, state.matter)
+        self._vector_stage(base, base, first, dt, 0.0, 1.0)
+        self._vector_rhs_dispatch(first, state.matter)
+        self._vector_stage(base, first, second, dt, 0.75, 0.25)
+        self._vector_rhs_dispatch(second, state.matter)
+        self._vector_stage(
+            base, second, final, dt, 1.0 / 3.0, 2.0 / 3.0
+        )
+        self._current_vector_dynamic = final_index
+        self._refresh_evolved_vector_input(final)
+        self._vector_stress_dispatch(state.matter.primitive)
+        output_index = (self._current_state + 1) % 5
+        self.module.theory33FullUpdateVectorStressKernel(
+            point=self.grid,
+            state=state.matter.tensor,
+            geometryInput=self._geometry,
+            previousVectorStress=self._previous_vector_stress,
+            currentVectorStress=self._vector_stress,
+            output=self._state_buffers[output_index],
+        )
+        self._current_state = output_index
+        state.matter.tensor = self._state_buffers[output_index]
+        state.matter.vector_stress = self._vector_stress
+
+    def step(
+        self,
+        state: VulkanTesseractCoupledState,
+        dt: float,
+        *,
+        apply_drag: bool = True,
+    ) -> VulkanTesseractCoupledState:
+        if dt <= 0.0 or not np.isfinite(dt):
+            raise ValueError("dt must be positive and finite")
+        self._advance_ccz4(state, 0.5 * dt)
+        self._advance_vectors(state, 0.5 * dt)
+        VulkanTheory33MultidimensionalBackend.step(
+            self, state.matter, dt, apply_drag=apply_drag
+        )
+        self._advance_vectors(state, 0.5 * dt)
+        self._advance_ccz4(state, 0.5 * dt)
+        state.time += float(dt)
+        state.steps += 1
+        return state
+
+    def snapshot(
+        self,
+        state: VulkanTesseractCoupledState,
+    ) -> VulkanTesseractEvolvedSnapshot:
+        coupled = super().snapshot(state)
+        dynamic = self._vector_dynamic_buffers[
+            self._current_vector_dynamic
+        ]
+        self._refresh_evolved_vector_input(dynamic)
+        return VulkanTesseractEvolvedSnapshot(
+            coupled=coupled,
+            vector_state=dynamic.to_numpy(),
+            vector_input=self._vector_input.to_numpy(),
+        )
+
+    def save_checkpoint(
+        self,
+        state: VulkanTesseractCoupledState,
+        path: str | Path,
+    ) -> Path:
+        """Write every evolved Carter, Proca, and CCZ4 resident field."""
+        snapshot = self.snapshot(state)
+        coupled = snapshot.coupled
+        target = Path(path)
+        np.savez_compressed(
+            target,
+            schema=np.array(
+                "vulkan-tesseract.evolved-checkpoint.v1"
+            ),
+            shape=np.asarray(self.shape, dtype=np.int64),
+            lengths=np.asarray(self.lengths, dtype=np.float64),
+            origins=np.asarray(self.origins, dtype=np.float64),
+            constitutive_model=np.array(self.constitutive_model),
+            reconstruction=np.array(self.reconstruction),
+            boundary_mode=np.array(self.boundary_mode),
+            derivative_order=np.array(
+                self.derivative_order, dtype=np.int64
+            ),
+            relaxation_time=np.array(self.relaxation_time),
+            vector_cleaning_damping=np.array(
+                self.vector_cleaning_damping
+            ),
+            matter_state=coupled.matter.state,
+            primitive=coupled.matter.primitive,
+            vector_state=snapshot.vector_state,
+            ccz4_state=coupled.ccz4_state,
+            time=np.array(coupled.time),
+            steps=np.array(coupled.steps, dtype=np.int64),
+        )
+        return target
+
+    def load_checkpoint(
+        self,
+        path: str | Path,
+    ) -> VulkanTesseractCoupledState:
+        """Restore all evolved fields and repeat projection/recovery audits."""
+        with np.load(Path(path), allow_pickle=False) as checkpoint:
+            schema = str(checkpoint["schema"])
+            if schema != "vulkan-tesseract.evolved-checkpoint.v1":
+                raise ValueError(f"unsupported checkpoint schema {schema!r}")
+            if tuple(checkpoint["shape"].tolist()) != self.shape:
+                raise ValueError("checkpoint grid shape does not match backend")
+            if str(checkpoint["constitutive_model"]) != self.constitutive_model:
+                raise ValueError("checkpoint constitutive model does not match")
+            if str(checkpoint["reconstruction"]) != self.reconstruction:
+                raise ValueError("checkpoint reconstruction does not match")
+            if str(checkpoint["boundary_mode"]) != self.boundary_mode:
+                raise ValueError("checkpoint boundary mode does not match")
+            if int(checkpoint["derivative_order"]) != self.derivative_order:
+                raise ValueError(
+                    "checkpoint derivative order does not match"
+                )
+            conserved = np.asarray(
+                checkpoint["matter_state"], dtype=np.float32
+            )
+            primitive = np.asarray(
+                checkpoint["primitive"], dtype=np.float32
+            )
+            vector_state = np.asarray(
+                checkpoint["vector_state"], dtype=np.float32
+            )
+            ccz4 = np.asarray(
+                checkpoint["ccz4_state"], dtype=np.float32
+            )
+            time = float(checkpoint["time"])
+            steps = int(checkpoint["steps"])
+        tracer = conserved[:, 10] / np.maximum(
+            conserved[:, 0], np.float32(1.0e-12)
+        )
+        restored = self.initialize(
+            primitive, vector_state, ccz4, tracer
+        )
+        uploaded = self.spy.Tensor.from_numpy(self.device, conserved)
+        state_index = (self._current_state + 1) % 5
+        self._state_buffers[state_index] = uploaded
+        self._current_state = state_index
+        recovered_index = (self._current_primitive + 1) % 4
+        self._recover(
+            uploaded,
+            restored.matter.primitive,
+            self._primitive_buffers[recovered_index],
+        )
+        self._current_primitive = recovered_index
+        restored.matter.tensor = uploaded
+        restored.matter.primitive = self._primitive_buffers[
+            recovered_index
+        ]
+        restored.matter.diagnostics = self._diagnostic_buffers[1]
+        self._refresh_evolved_vector_input(
+            self._vector_dynamic_buffers[
+                self._current_vector_dynamic
+            ]
+        )
+        self._vector_stress_dispatch(restored.matter.primitive)
+        restored.matter.vector_stress = self._vector_stress
+        restored.matter.geometry = self._geometry
+        restored.matter.time = time
+        restored.matter.steps = steps
+        restored.time = time
+        restored.steps = steps
+        return restored
 
 
 class VulkanCCZ4GeometryBackend:
@@ -2085,6 +3689,7 @@ class VulkanCCZ4GeometryBackend:
         eta_shift: float = 1.0,
         slicing: str = "1+log",
         evolve_shift: bool = True,
+        derivative_order: int = 2,
     ) -> VulkanCCZ4VacuumSnapshot:
         """Evaluate the derivative-containing periodic vacuum operator."""
         if not 1 <= len(shape) <= 3:
@@ -2108,6 +3713,14 @@ class VulkanCCZ4GeometryBackend:
             raise ValueError("invalid shift parameters")
         if slicing not in {"1+log", "harmonic"}:
             raise ValueError("unknown slicing condition")
+        if derivative_order not in {2, 4}:
+            raise ValueError("derivative_order must be 2 or 4")
+        if derivative_order == 4 and any(
+            value < 8 for value in expanded[: len(shape)]
+        ):
+            raise ValueError(
+                "fourth-order CCZ4 derivatives need eight cells per axis"
+            )
         values = VulkanTheory33SourceBackend._array(
             state,
             shape=(self.points, CCZ4_STATE_WIDTH),
@@ -2128,6 +3741,7 @@ class VulkanCCZ4GeometryBackend:
             inverseDx=float(1.0 / spacing[0]),
             inverseDy=float(1.0 / spacing[1]),
             inverseDz=float(1.0 / spacing[2]),
+            derivativeOrder=int(derivative_order),
             kappa1=float(kappa1),
             kappa2=float(kappa2),
             kappa3=float(kappa3),

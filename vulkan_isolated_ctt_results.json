@@ -1,0 +1,40 @@
+{
+  "adm_audit": {
+    "hamiltonian_core_l2": 7.060699370431708e-06,
+    "momentum_core_linf": 1.1631573329256206e-08
+  },
+  "backend": "Slang/Vulkan fp64",
+  "cpu_parity": {
+    "conformal_factor_maximum_absolute_error": 2.5441870832310087e-11,
+    "iteration_difference": 0,
+    "vector_potential_maximum_absolute_error": 2.067910551928581e-13
+  },
+  "localized_matter": {
+    "hamiltonian_residual_l2": 6.21108684163521e-07,
+    "iterations": 260,
+    "maximum_conformal_factor": 1.0009287555079416,
+    "minimum_conformal_factor": 1.0,
+    "momentum_residual_l2": 1.773511237940511e-10,
+    "scalar_readbacks": 15
+  },
+  "qualification": {
+    "fp64_ctt_fields_match_original": true,
+    "isolated_outer_data_are_exact": true,
+    "localized_matter_ctt_converges": true,
+    "packed_geometry_reduces_adm_constraints": true,
+    "vacuum_is_exact_flat_fixed_point": true
+  },
+  "qualified": true,
+  "schema": "vulkan-tesseract.isolated-ctt.v1",
+  "shape": [
+    10,
+    10,
+    10
+  ],
+  "vacuum": {
+    "converged": true,
+    "hamiltonian_residual_l2": 0.0,
+    "iterations": 1,
+    "momentum_residual_l2": 0.0
+  }
+}

@@ -105,11 +105,9 @@ This is the complete numerical Carter flux/path eigensystem for the five
 independent physical fields in the resident flat-1D ABI. Entropy and tracer
 remain passive reconstructed fields.
 
-It is not yet the full 3D nine-field Carter block used by the CPU NR solver:
-transverse momentum and carrier canonical-momentum modes enter when the
-resident state becomes multidimensional. The next port boundary is therefore
-the mixed-vector stress and drag/source sector, followed by CCZ4 geometry and
-the 3D extension of this same numerical-symbol machinery.
+At this historical milestone it was the complete five-field flat-1D
+eigensystem; the full 3D nine-field block, transverse momentum, and carrier
+canonical-momentum modes were the next port boundary.
 
 Those local nine-field, source, CCZ4, and multidimensional execution
 boundaries were subsequently crossed. See the

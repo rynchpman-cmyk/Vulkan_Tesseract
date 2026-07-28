@@ -1,0 +1,99 @@
+{
+  "backend": "Slang/Vulkan",
+  "ccz4_boundary_maximum_absolute_error": 9.778887033462524e-09,
+  "ccz4_fd4_boundary_maximum_absolute_error": 1.7159618437290192e-07,
+  "ccz4_fd4_interior_maximum_absolute_error": 0.0,
+  "ccz4_interior_maximum_absolute_error": 0.0,
+  "final_integrated_carrier": 0.0026682454627007246,
+  "fourth_order_full_stack_finite": true,
+  "fourth_order_full_stack_host_reads": 0,
+  "fourth_order_full_stack_invalid_recoveries": 0,
+  "gauss_A_fd4_rhs_linf": 9.806826710700989e-07,
+  "gauss_A_rhs_linf": 9.778887033462524e-07,
+  "gauss_B_fd4_rhs_linf": 2.4726614356040955e-07,
+  "gauss_B_rhs_linf": 2.5168992578983307e-07,
+  "host_reads_during_evolution": 0,
+  "initial_integrated_carrier": 0.0026682522147893906,
+  "invalid_recoveries": 0,
+  "linear_flux_maximum_absolute_error": {
+    "-1": 1.330676094146721e-06,
+    "1": 1.2693879283783623e-06
+  },
+  "lower_boundary_carrier_change": 0.0,
+  "multidimensional_boundary_audits": [
+    {
+      "ccz4_boundary_maximum_absolute_error": 3.315508365665798e-07,
+      "ccz4_interior_maximum_absolute_error": 0.0,
+      "derivative_order": 2,
+      "dimensions": 2,
+      "gauss_A_rhs_linf": 3.725290298461914e-09,
+      "gauss_B_rhs_linf": 3.725290298461914e-09,
+      "proca_maximum_absolute_error": 3.026798367500305e-09,
+      "qualified": true,
+      "shape": [
+        8,
+        8
+      ]
+    },
+    {
+      "ccz4_boundary_maximum_absolute_error": 2.73510813713837e-06,
+      "ccz4_interior_maximum_absolute_error": 0.0,
+      "derivative_order": 4,
+      "dimensions": 2,
+      "gauss_A_rhs_linf": 5.8013635423348475e-09,
+      "gauss_B_rhs_linf": 3.725290298461914e-09,
+      "proca_maximum_absolute_error": 7.314156391657889e-09,
+      "qualified": true,
+      "shape": [
+        8,
+        8
+      ]
+    },
+    {
+      "ccz4_boundary_maximum_absolute_error": 5.858658922303084e-07,
+      "ccz4_interior_maximum_absolute_error": 0.0,
+      "derivative_order": 2,
+      "dimensions": 3,
+      "gauss_A_rhs_linf": 7.450580596923828e-09,
+      "gauss_B_rhs_linf": 4.6566128730773926e-09,
+      "proca_maximum_absolute_error": 5.820766091346741e-09,
+      "qualified": true,
+      "shape": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "ccz4_boundary_maximum_absolute_error": 4.655780734080794e-06,
+      "ccz4_interior_maximum_absolute_error": 0.0,
+      "derivative_order": 4,
+      "dimensions": 3,
+      "gauss_A_rhs_linf": 1.4901161193847656e-08,
+      "gauss_B_rhs_linf": 1.4901161193847656e-08,
+      "proca_maximum_absolute_error": 1.261165986227164e-08,
+      "qualified": true,
+      "shape": [
+        8,
+        8,
+        8
+      ]
+    }
+  ],
+  "points": 48,
+  "qualification": {
+    "ccz4_radiative_constraint_projection_matches_cpu": true,
+    "fourth_order_ccz4_boundary_matches_cpu": true,
+    "fourth_order_full_stack_boundary_step_is_resident": true,
+    "fourth_order_proca_boundary_is_gauss_compatible": true,
+    "linear_characteristic_flux_matches_cpu": true,
+    "lower_boundary_has_no_detectable_inflow": true,
+    "mixed_proca_boundary_is_gauss_compatible": true,
+    "outgoing_carter_pulse_loses_carrier": true,
+    "physical_boundary_evolution_is_resident": true,
+    "physical_boundary_recovery_remains_valid": true,
+    "two_and_three_dimensional_fd2_fd4_boundaries_match": true
+  },
+  "qualified": true,
+  "schema": "vulkan-tesseract.physical-boundaries.v1"
+}

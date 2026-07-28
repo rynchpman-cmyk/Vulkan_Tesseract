@@ -1,0 +1,50 @@
+{
+  "backend": "Slang/Vulkan",
+  "ccz4_derivative_order": 4,
+  "ccz4_derivatives": "periodic centered FD4",
+  "constitutive_model": "qualified_frozen",
+  "dt": 0.0002,
+  "metrics": {
+    "all_outputs_finite": true,
+    "baryon_balance_error": 4.074231017764234e-08,
+    "carrier_balance_error": 9.778887033462524e-09,
+    "ccz4_vacuum_maximum_absolute_error": 7.569789886474609e-06,
+    "ccz4_vacuum_rms_error": 8.500209578061354e-07,
+    "ccz4_vacuum_worst_component": 19,
+    "ccz4_vacuum_worst_cpu_value": 0.7583504319190979,
+    "ccz4_vacuum_worst_gpu_value": 0.7583580017089844,
+    "checkpoint_continuation_error": 7.275957614183426e-12,
+    "checkpoint_geometry_roundtrip_error": 3.637978807091713e-12,
+    "checkpoint_state_roundtrip_error": 0.0,
+    "entropy_change": 0.00014854967594146729,
+    "final_maximum_recovery_residual": 2.9228416678961366e-05,
+    "host_reads_during_evolution": 0,
+    "initial_maximum_recovery_residual": 1.3553431987833875e-10,
+    "invalid_final_recoveries": 0,
+    "maximum_projection_determinant_residual": 0.0,
+    "maximum_projection_trace_a_residual": 7.275957614183426e-12,
+    "minimum_absolute_switching_margin": 0.0005036341026425362,
+    "minimum_final_lapse": 0.9939981698989868,
+    "tracer_balance_error": 2.328131962046729e-08
+  },
+  "qualification": {
+    "ccz4_projection_constraints_hold": true,
+    "checkpoint_restart_is_exact": true,
+    "curved_nine_variable_recovery_valid": true,
+    "derivative_ccz4_matches_fd4_cpu": true,
+    "frozen_switching_margin_remains_resolved": true,
+    "full_stack_outputs_are_finite": true,
+    "full_stack_remains_device_resident": true,
+    "periodic_transport_balances_conserved_scalars": true,
+    "strang_drag_is_entropy_producing": true
+  },
+  "qualified": true,
+  "schema": "vulkan-tesseract.multidimensional-full-stack.v1",
+  "shape": [
+    8,
+    8
+  ],
+  "spatial_operator": "multidirectional Rusanov plus midpoint Carter DLM path",
+  "steps": 2,
+  "time_integrator": "CCZ4 half-step / Carter SSP-RK3 with implicit drag / CCZ4 half-step"
+}

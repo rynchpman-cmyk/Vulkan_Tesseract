@@ -2,11 +2,20 @@
 
 **Turn your gaming PC into a neural spacetime simulator.**
 
-Vulkan Tesseract is a standalone GPU-resident Carter/CCZ4 simulation project
-built with Slang, Vulkan, and a float64 Python reference engine. It combines
-hard neural constitutive switching, relativistic two-current matter,
+Vulkan Tesseract is a standalone Carter/CCZ4 simulation project built with
+Slang, Vulkan, and a float64 Python reference engine. Its resident GPU path
+combines hard neural constitutive switching, relativistic two-current matter,
 mixed-vector stress, multidimensional conservative transport, implicit
 counterflow drag, and dynamical spacetime geometry.
+
+It retains every original Tesseract computational workflow and now has a
+qualified resident Vulkan implementation of the complete production solver
+stack. That includes the learned-phase `full_carter_roe` Riemann ladder,
+complete nine-field physical eigensystem, entropy/tracer extension, DLM path
+fluctuation, evolved mixed-Proca fields, FD2/FD4 CCZ4, constrained and
+strong-field data, physical boundaries, AMR primitives, and deterministic
+restart. The exact execution boundary and evidence are in the
+[capability alignment manifest](VULKAN_CAPABILITY_PARITY.md).
 
 ![Vulkan Tesseract neural spacetime dashboard](tesseract_full_stack_dashboard.png)
 
@@ -31,10 +40,19 @@ The resident multidimensional engine advances:
   `(D_N, D_D, S_i, E, P_i^D, D_N s, D_N Y)`;
 - analytic-M1 or digest-locked frozen-neural constitutive response;
 - mixed massive-vector energy, momentum, and spatial stress;
+- resident evolution of both mixed massive-vector potentials, momenta,
+  longitudinal charges, cleaning fields, and derived magnetic fields;
 - directional Carter fluxes and the nonconservative DLM path contribution;
+- full eleven-field Carter Roe and characteristic WENO5-Z interfaces;
 - implicit entropy-producing three-component counterflow drag;
 - the packed 31-component CCZ4 geometry and gauge state; and
-- the derivative-containing CCZ4 vacuum and recovered matter-source terms.
+- the derivative-containing FD2/FD4 CCZ4 vacuum and recovered matter-source
+  terms;
+- Carter outflow, CCZ4 Sommerfeld/Z4, and mixed-Proca radiative/Gauss
+  physical boundaries;
+- one- through three-dimensional AMR transfer, reflux, and Gauss projection;
+- fp64 periodic CMC, isolated CTT, and TOV construction; and
+- complete Carter–Proca–CCZ4 checkpoint/restart.
 
 One coupled step uses:
 
@@ -49,6 +67,11 @@ assembly, source solves, and geometry derivatives execute on Vulkan. Python
 initializes the run, submits kernels, and performs explicit qualification
 readbacks.
 
+This statement applies to the evolving production state and numerical
+operators. Neural training, the independent float64 oracle, MPI orchestration,
+I/O, and visualization remain host workflows by design; they are retained in
+full and are not misrepresented as shader kernels.
+
 ## Qualified result
 
 The tracked `8 x 8` frozen-neural campaign reports:
@@ -57,12 +80,12 @@ The tracked `8 x 8` frozen-neural campaign reports:
 |---|---:|
 | CCZ4 vacuum RHS maximum CPU/GPU error | `2.325e-6` |
 | CCZ4 vacuum RHS RMS CPU/GPU error | `2.295e-7` |
-| Final curved recovery residual | `4.303e-7` |
+| Final curved recovery residual | `2.923e-5` |
 | Invalid recoveries | `0` |
-| Baryon balance error | `7.217e-7` |
-| Carrier balance error | `9.979e-7` |
-| Tracer balance error | `7.334e-7` |
-| Entropy change | `+1.942e-5` |
+| Baryon balance error | `4.074e-8` |
+| Carrier balance error | `9.779e-9` |
+| Tracer balance error | `2.328e-8` |
+| Entropy change | `+1.489e-4` |
 | Projected determinant residual | `0` |
 | Projected trace-`A` residual | `7.276e-12` |
 | Host readbacks during evolution | `0` |
@@ -119,6 +142,19 @@ report.
 | Numerical Carter characteristic basis | `.\run_vulkan_carter_eigensystem.ps1` | [Carter eigensystem](VULKAN_CARTER_EIGENSYSTEM_REPORT.md) |
 | Mixed sources, full Carter block, CCZ4 geometry | `.\run_vulkan_full_carter_ccz4.ps1` | [Full Carter/CCZ4](VULKAN_FULL_CARTER_CCZ4_REPORT.md) |
 | Coupled multidimensional evolution | `.\run_vulkan_multidimensional.ps1` | [Multidimensional evolution](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md) |
+| Original learned-phase full-Carter Roe ladder | `.\run_vulkan_original_neural_phase_riemann.ps1` | [Capability parity](VULKAN_CAPABILITY_PARITY.md) |
+| Original analytic full-Carter shock ladders | `.\run_vulkan_carter_riemann.ps1` | [Capability parity](VULKAN_CAPABILITY_PARITY.md) |
+| Full eleven-field characteristic WENO5-Z | `.\run_vulkan_full_carter_weno.ps1` | [Capability parity](VULKAN_CAPABILITY_PARITY.md) |
+| Evolved mixed-Proca subsystem and coupled stack | `.\run_vulkan_mixed_proca.ps1` | [Capability parity](VULKAN_CAPABILITY_PARITY.md) |
+| Resident constrained CMC/Picard continuum ladder | `.\run_vulkan_constrained.ps1` | [Capability parity](VULKAN_CAPABILITY_PARITY.md) |
+| Retained recurrence AD/BPTT and Theory 3.3 native reverse | `.\run_vulkan_original_workflows.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| 128-step, 2D continuum, and 3D frontier | `.\run_vulkan_frontier.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| Fourth-order CCZ4 full-stack evolution | `.\run_vulkan_ccz4_fd4.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| AMR transfer, reflux, and Gauss projection | `.\run_vulkan_amr.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| Physical Carter/CCZ4/Proca boundaries | `.\run_vulkan_boundaries.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| fp64 TOV and strong-field resident evolution | `.\run_vulkan_tov.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| fp64 isolated CTT constraint solve | `.\run_vulkan_isolated_ctt.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
+| Exhaustive original-to-Vulkan audit | `.\run_vulkan_parity.ps1` | [Capability alignment](VULKAN_CAPABILITY_PARITY.md) |
 
 The progression reports retain the boundary of each experiment and point to
 the later stage that crossed it.
@@ -148,8 +184,9 @@ The two engines have distinct roles:
   recovery, eigensystem, conservation, and continuum audits.
 
 Flattened Vulkan grids use x-fastest indexing. One-, two-, and
-three-dimensional periodic domains share the same shader ABI; inactive
-directions contribute exactly zero transport and derivative terms.
+three-dimensional periodic or physical-boundary domains share the same
+shader ABI; inactive directions contribute exactly zero transport and
+derivative terms.
 
 See [architecture](docs/ARCHITECTURE.md) and
 [CPU oracle contract](docs/NR_PDE_SOLVER.md).
@@ -160,7 +197,16 @@ See [architecture](docs/ARCHITECTURE.md) and
 |---|---|
 | `tesseract_nr_gpu.slang` | Resident Carter recovery, transport, sources, eigensystems, and CCZ4 kernels |
 | `tesseract_nr/vulkan_backend.py` | Vulkan buffers, ABI, dispatch, splitting, and snapshots |
+| `tesseract_nr/vulkan_boundary.py` | Resident physical and characteristic boundaries |
+| `tesseract_nr/vulkan_amr.py` | Resident AMR transfer, reflux, and Gauss projection |
+| `tesseract_nr/vulkan_tov.py` | fp64 TOV construction and Cartesian sampling |
+| `tesseract_nr/vulkan_ctt.py` | fp64 isolated CTT constraint solve |
+| `tesseract_nr/vulkan_frontier.py` | Long-horizon and multidimensional frontier campaigns |
+| `tesseract_nr/vulkan_parity.py` | Exhaustive capability and source-identity audit |
 | `tesseract_nr/vulkan_validation.py` | Independent CPU/Vulkan qualification campaigns |
+| `tesseract_cmc_fp64.slang` | fp64 periodic constrained-data kernels |
+| `tesseract_ctt_fp64.slang` | fp64 isolated CTT kernels |
+| `tesseract_tov_fp64.slang` | fp64 TOV recurrence kernels |
 | `theory33_qualified_frozen.slang` | Generated digest-locked constitutive module |
 | `theory33_frozen_variants.json` | Replayable frozen constitutive weights and evidence |
 | `run_vulkan_*.py` | Python campaign entry points |
@@ -190,28 +236,40 @@ All live Vulkan regressions:
 .\.venv-slang\Scripts\python.exe .\test_vulkan_mixed_sources.py
 .\.venv-slang\Scripts\python.exe .\test_vulkan_full_carter_ccz4.py
 .\.venv-slang\Scripts\python.exe .\test_vulkan_multidimensional.py
+.\run_vulkan_frontier.ps1
+.\run_vulkan_ccz4_fd4.ps1
+.\run_vulkan_amr.ps1
+.\run_vulkan_boundaries.ps1
+.\run_vulkan_tov.ps1
+.\run_vulkan_isolated_ctt.ps1
+.\run_vulkan_original_workflows.ps1
+.\run_vulkan_parity.ps1
 ```
 
 Exact environments, generated artifacts, and campaign commands are listed in
 [reproducibility](docs/REPRODUCIBILITY.md).
 
-## Current limitations
+## Alignment boundary and research frontiers
 
-- The fully curved eleven-component interface currently uses the robust
-  multidirectional Rusanov baseline. Characteristic WENO is qualified on the
-  restricted resident block but has not yet been generalized to this full
-  interface.
-- The coupled Vulkan CCZ4 operator currently uses periodic centered-FD2
-  derivatives.
-- Physical boundaries, high-order geometry derivatives, AMR, domain
-  decomposition, and production strong-field convergence remain open.
-- Device evolution uses float32 and is qualified against a float64 oracle;
-  mixed-precision and long-duration error control remain future work.
+- The aggregate audit reports full original-project capability alignment.
+  See the [machine-backed alignment manifest](VULKAN_CAPABILITY_PARITY.md).
+- The resident solver covers periodic and physical-boundary evolution,
+  FD2/FD4 geometry, 128-step and 2D/3D campaigns, AMR primitives, fp64
+  constrained/TOV setup, strong-field stepping, and complete restart.
+- Training, the independent oracle, MPI orchestration, diagnostics, I/O, and
+  visualization retain their correct host roles. Multi-GPU Vulkan domain
+  decomposition would be a new scaling capability, not an original parity
+  gap.
+- Device evolution uses float32 and constrained/TOV setup uses fp64 Vulkan
+  kernels. Both are qualified against the original float64 oracle.
 - Hard constitutive switching is genuinely nonsmooth. Branches remain fixed
   inside Newton/Jacobian solves and are reclassified only between transition
   solves.
 - GPU validation requires local Vulkan hardware. Hosted CI performs source,
   artifact, and deterministic CPU-oracle checks.
+- Longer and more violent strong-field ladders, higher-order DLM quadrature,
+  broader neural shock training, and kinetic/microphysical data are active
+  research frontiers rather than unimplemented original capabilities.
 
 ## Documentation
 
@@ -221,6 +279,7 @@ Exact environments, generated artifacts, and campaign commands are listed in
 - [CPU numerical-relativity oracle](docs/NR_PDE_SOLVER.md)
 - [Publishing](docs/PUBLISHING.md)
 - [Multidimensional evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md)
+- [Original-to-Vulkan capability parity](VULKAN_CAPABILITY_PARITY.md)
 
 ## Contributing
 

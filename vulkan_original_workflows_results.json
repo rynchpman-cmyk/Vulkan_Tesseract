@@ -1,0 +1,115 @@
+{
+  "backend": "Slang/Vulkan",
+  "conditioned_literal_audit": {
+    "kkt_valid": true,
+    "max_abs_state": 0.8,
+    "max_kkt_condition": 1.428214909888832,
+    "max_local_gain": 6.15758651778664,
+    "max_lyapunov_growth": 0.0,
+    "min_classifier_margin": 0.02675923746234035,
+    "min_kkt_margin": 0.037540240291216775,
+    "min_parity_margin": 0.125,
+    "steps": 128,
+    "terminal": [
+      0.10194938532959161,
+      0.10194938532959152,
+      0.10194938532959161,
+      0.10194938532959152
+    ],
+    "terminal_lyapunov": 3.0814879110195774e-33
+  },
+  "live_checks": {
+    "complete_carter_kkt_recurrence_and_vjp": {
+      "passed": true,
+      "return_code": 0,
+      "script": "test_full_slang_recurrence.py",
+      "stdout": [
+        "[WARN] Cannot enable D3D12 Agility SDK: Executable directory \"C:\\Users\\rynch\\miniconda3\" is not on the same drive as the SDK directory \"F:\\FORGE\\Tools\\Vulkan_Tesseract\\.venv-slang\\Lib\\site-packages\\slangpy\\.\\D3D12\\\".",
+        "running piecewise physical closure VJP...",
+        "physical closure VJP succeeded",
+        "nonzero closure adjoints: 12 max: 0.009524822235107422",
+        "compiling/running exact neural closure VJP...",
+        "nonzero per-sample weight VJP: 2574 max: 0.003826799802482128",
+        "neural closure VJP succeeded",
+        "backend: Vulkan / complete Carter-KKT Slang recurrence",
+        "z_next: 0.93656069 0.2507613 0.693561733 2.90240049",
+        "active masks: [40, 40, 40, 40]",
+        "classifier masks: [2, 2, 11, 11]",
+        "boundary iota: [1, 1, 1, 1]",
+        "compact/full primal max error: 0",
+        "weights differentiated: 1287",
+        "nonzero weight gradients: 1287",
+        "VJP finite-difference indices: [4, 1256, 0, 1261, 1, 2]",
+        "VJP max finite-difference error: 5.70435077e-09",
+        "VJP max finite-difference relative error: 1.09522662e-05",
+        "complete physical reverse pass succeeded"
+      ]
+    },
+    "native_master_reverse_mode": {
+      "passed": true,
+      "return_code": 0,
+      "script": "test_slang_ad.py",
+      "stdout": [
+        "[WARN] Cannot enable D3D12 Agility SDK: Executable directory \"C:\\Users\\rynch\\miniconda3\" is not on the same drive as the SDK directory \"F:\\FORGE\\Tools\\Vulkan_Tesseract\\.venv-slang\\Lib\\site-packages\\slangpy\\.\\D3D12\\\".",
+        "backend: Vulkan / Slang reverse mode",
+        "weights differentiated: 1287",
+        "max output error:  2.38e-07",
+        "max weight error:  2.38e-07",
+        "max feature error: 3.73e-09",
+        "native Carter master reverse-mode test passed"
+      ]
+    },
+    "native_recurrent_bptt": {
+      "passed": true,
+      "return_code": 0,
+      "script": "test_slang_bptt.py",
+      "stdout": [
+        "[WARN] Cannot enable D3D12 Agility SDK: Executable directory \"C:\\Users\\rynch\\miniconda3\" is not on the same drive as the SDK directory \"F:\\FORGE\\Tools\\Vulkan_Tesseract\\.venv-slang\\Lib\\site-packages\\slangpy\\.\\D3D12\\\".",
+        "backend: Vulkan / Slang reverse-through-time",
+        "unroll steps: 2",
+        "shared weights differentiated: 1287",
+        "nonzero weight gradients: 1287",
+        "max sampled finite-difference error: 2.63e-05",
+        "native recurrent BPTT probe passed"
+      ]
+    },
+    "qualified_frozen_constitutive": {
+      "passed": true,
+      "return_code": 0,
+      "script": "test_theory33_frozen_slang.py",
+      "stdout": [
+        "[WARN] Cannot enable D3D12 Agility SDK: Executable directory \"C:\\Users\\rynch\\miniconda3\" is not on the same drive as the SDK directory \"F:\\FORGE\\Tools\\Vulkan_Tesseract\\.venv-slang\\Lib\\site-packages\\slangpy\\.\\D3D12\\\".",
+        "backend: Vulkan / qualified frozen Theory 3.3",
+        "master error:     9.03e-08",
+        "reverse error:    2.64e-06",
+        "controller error: 9.92e-08",
+        "mobility error:   2.69e-08",
+        "covariant error:  2.69e-08",
+        "minimum entropy:  0.000554",
+        "qualified frozen Slang validation passed"
+      ]
+    },
+    "theory33_constitutive_reverse": {
+      "passed": true,
+      "return_code": 0,
+      "script": "test_theory33_slang.py",
+      "stdout": [
+        "[WARN] Cannot enable D3D12 Agility SDK: Executable directory \"C:\\Users\\rynch\\miniconda3\" is not on the same drive as the SDK directory \"F:\\FORGE\\Tools\\Vulkan_Tesseract\\.venv-slang\\Lib\\site-packages\\slangpy\\.\\D3D12\\\".",
+        "backend: Vulkan / Slang reverse mode",
+        "max constitutive error: 1.91e-06",
+        "max reverse error:      9.54e-07",
+        "Theory 3.3 Slang constitutive validation passed"
+      ]
+    }
+  },
+  "qualification": {
+    "complete_carter_kkt_recurrence_and_vjp": true,
+    "conditioned_literal_128_step_audit": true,
+    "native_master_reverse_mode": true,
+    "native_recurrent_bptt": true,
+    "qualified_frozen_constitutive": true,
+    "theory33_constitutive_reverse": true
+  },
+  "qualified": true,
+  "schema": "vulkan-tesseract.original-workflows.v1"
+}

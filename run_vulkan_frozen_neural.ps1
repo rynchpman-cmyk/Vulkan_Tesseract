@@ -2,6 +2,19 @@ param(
     [string]$Resolutions = "16,32,64",
     [double]$FinalTime = 0.1,
     [double]$Cfl = 0.12,
+    [ValidateSet(
+        "piecewise_constant",
+        "weno5_z",
+        "carter_characteristic_weno5_z",
+        "carter_characteristic_roe"
+    )]
+    [string]$Reconstruction = "piecewise_constant",
+    [switch]$PositivityPreserving,
+    [ValidateSet(
+        "moving_phase_contact",
+        "original_neural_phase_riemann"
+    )]
+    [string]$Problem = "moving_phase_contact",
     [string]$Output = "vulkan_frozen_neural_results.json"
 )
 
@@ -19,9 +32,17 @@ if ($LASTEXITCODE -ne 0) {
     throw "SlangPy environment setup failed with exit code $LASTEXITCODE."
 }
 
-& $python (Join-Path $projectDir "run_vulkan_frozen_neural.py") `
-    --resolutions $Resolutions `
-    --final-time $FinalTime `
-    --cfl $Cfl `
-    --output $Output
+$arguments = @(
+    (Join-Path $projectDir "run_vulkan_frozen_neural.py"),
+    "--resolutions", $Resolutions,
+    "--final-time", $FinalTime,
+    "--cfl", $Cfl,
+    "--reconstruction", $Reconstruction,
+    "--problem", $Problem,
+    "--output", $Output
+)
+if ($PositivityPreserving) {
+    $arguments += "--positivity-preserving"
+}
+& $python @arguments
 exit $LASTEXITCODE

@@ -17,6 +17,28 @@ def main() -> None:
     parser.add_argument("--final-time", type=float, default=0.1)
     parser.add_argument("--cfl", type=float, default=0.12)
     parser.add_argument(
+        "--reconstruction",
+        choices=(
+            "piecewise_constant",
+            "weno5_z",
+            "carter_characteristic_weno5_z",
+            "carter_characteristic_roe",
+        ),
+        default="piecewise_constant",
+    )
+    parser.add_argument(
+        "--positivity-preserving",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--problem",
+        choices=(
+            "moving_phase_contact",
+            "original_neural_phase_riemann",
+        ),
+        default="moving_phase_contact",
+    )
+    parser.add_argument(
         "--module",
         type=Path,
         default=Path("tesseract_nr_gpu.slang"),
@@ -31,6 +53,9 @@ def main() -> None:
         tuple(int(value) for value in args.resolutions.split(",")),
         final_time=args.final_time,
         cfl=args.cfl,
+        reconstruction=args.reconstruction,
+        positivity_preserving=args.positivity_preserving,
+        problem=args.problem,
         module_path=args.module,
     )
     args.output.write_text(

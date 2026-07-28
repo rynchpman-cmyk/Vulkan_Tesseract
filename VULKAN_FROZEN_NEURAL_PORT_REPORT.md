@@ -85,9 +85,42 @@ python -m unittest tests.nr.test_vulkan_reference -v
 
 ## Honest boundary
 
-This qualifies active neural constitutive execution in the resident flat 1D
-material solver. It does not yet claim that the complete NR stack is on GPU.
-The remaining dependency chain is:
+### Original learned-phase Riemann parity audit
+
+The original Tesseract learned-phase Riemann campaign is now represented by a
+separate literal initial-data option:
+
+`original_neural_phase_riemann`
+
+It uses `n=0.10`, `epsilon=0.12`, `v_N=0`, `d=0.005`, and carrier velocities
+`0.112/0.103`, exactly matching the original left/right states. The resident
+backend also now provides a branch-aware
+`carter_characteristic_roe` reconstruction for the independent longitudinal
+five-field block.
+
+The corrected 16/32/64/128 GPU ladder at `t=0.02`, CFL `0.12`:
+
+- passes all 37 resident qualification gates;
+- performs no host readback during any evolution interval;
+- has zero recovery failures and zero hard-phase disagreements with the
+  matching float64 restricted oracle; and
+- changes `0/0/0/3` cell branches.
+
+The original full nine-field plus entropy/tracer float64
+`full_carter_roe` campaign changes `0/0/0/4` branches. Therefore the
+restricted resident Roe result is a successful GPU execution and a useful
+localization experiment, but it is not claimed as exact original parity.
+The boundary at this historical milestone was the complete eleven-field Roe
+basis, its exact DLM path fluctuation, and arithmetic-sensitivity
+qualification. That boundary is closed by
+`vulkan_original_neural_phase_full_roe_results.json`.
+
+Tracked evidence:
+`vulkan_original_neural_phase_roe_results.json`.
+
+This campaign qualified active neural constitutive execution in the resident
+flat 1D material solver. At that historical milestone, the dependency chain
+was:
 
 1. higher-order reconstruction with positivity-preserving fallback;
 2. the complete numerical Carter flux/path eigensystem;
@@ -98,6 +131,6 @@ The remaining dependency chain is:
 
 The frozen-neural closure and hard phase tape no longer block those ports.
 
-Items 1–5 were subsequently promoted and qualified. Current full-stack scope
-and the remaining adjoint/strong-field frontier are recorded in the
-[multidimensional Vulkan evolution report](VULKAN_MULTIDIMENSIONAL_EVOLUTION_REPORT.md).
+All six items were subsequently promoted or retained in their correct
+execution role and qualified. Current full-stack scope is recorded in the
+[capability alignment manifest](VULKAN_CAPABILITY_PARITY.md).

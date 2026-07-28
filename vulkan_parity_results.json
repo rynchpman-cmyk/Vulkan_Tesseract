@@ -1,0 +1,348 @@
+{
+  "capabilities": [
+    {
+      "artifacts": {
+        "vulkan_original_workflows_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "retained_original_vulkan",
+      "id": "literal_carter_kkt_recurrence_and_ad",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "carter_tesseract_kkt.comp",
+        "carter_master_ad.slang",
+        "carter_tesseract_full.slang",
+        "carter_tesseract_conditioned.slang",
+        "run_full_slang.ps1",
+        "run_slang_ad.ps1",
+        "run_conditioned_literal.ps1",
+        "run_progressive_full.ps1",
+        "hybrid_tesseract.py",
+        "progressive_full_unroll.py",
+        "migrate_full_slang.py",
+        "hybrid_model_conditioned.json"
+      ]
+    },
+    {
+      "artifacts": {
+        "vulkan_original_workflows_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "retained_original_vulkan",
+      "id": "theory33_physical_hybrid_and_native_reverse",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "theory33_hybrid.py",
+        "theory33_hybrid.slang",
+        "run_theory33_hybrid.ps1",
+        "run_theory33_slang.ps1",
+        "run_theory33_frozen_slang.ps1"
+      ]
+    },
+    {
+      "artifacts": {
+        "theory33_advanced_results.json": {
+          "passes": true,
+          "status_field": "passed"
+        },
+        "theory33_experiment_results.json": {
+          "passes": true,
+          "status_field": "passed"
+        }
+      },
+      "execution_mode": "retained_optional_training",
+      "id": "theory33_training_replay_and_event_bptt",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "theory33_advanced.py",
+        "theory33_experiments.py",
+        "run_theory33_advanced.py",
+        "run_theory33_experiments.py",
+        "generate_theory33_kinetic_data.py",
+        "export_theory33_frozen_slang.py",
+        "train_hybrid.py",
+        "train_lyapunov_conditioned.py",
+        "theory33_frozen_variants.json",
+        "data/theory33_kinetic_metadata.json",
+        "data/theory33_kinetic_transport.csv",
+        "data/theory33_noisy_phase_trajectories.csv",
+        "theory33_advanced_results.json",
+        "theory33_experiment_results.json"
+      ]
+    },
+    {
+      "artifacts": {
+        "vulkan_frozen_neural_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_theory33_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_theory33_analytic_and_frozen_material",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "run_vulkan_theory33.ps1",
+        "run_vulkan_frozen_neural.ps1"
+      ]
+    },
+    {
+      "artifacts": {
+        "vulkan_carter_eigensystem_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_full_carter_weno_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_weno_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_positivity_weno_and_complete_eigensystems",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": []
+    },
+    {
+      "artifacts": {
+        "vulkan_carter_riemann_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_original_neural_phase_full_roe_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_full_carter_roe_dlm_and_riemann_ladders",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": []
+    },
+    {
+      "artifacts": {
+        "vulkan_mixed_proca_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_mixed_source_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_mixed_vector_drag_and_dynamic_proca",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": []
+    },
+    {
+      "artifacts": {
+        "vulkan_ccz4_fd4_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_full_carter_ccz4_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "vulkan_multidimensional_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_curved_multidimensional_carter_ccz4",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": []
+    },
+    {
+      "artifacts": {
+        "vulkan_constrained_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_constrained_cmc_and_continuum",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": []
+    },
+    {
+      "artifacts": {
+        "vulkan_frontier_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_128_step_2d_and_3d_frontier",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": []
+    },
+    {
+      "artifacts": {
+        "vulkan_boundary_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_physical_boundaries",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "tesseract_nr/vulkan_boundary.py",
+        "run_vulkan_boundaries.ps1"
+      ]
+    },
+    {
+      "artifacts": {
+        "vulkan_amr_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_amr_transfer_reflux_and_gauss_projection",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "tesseract_nr/vulkan_amr.py",
+        "run_vulkan_amr.ps1"
+      ]
+    },
+    {
+      "artifacts": {
+        "vulkan_tov_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_tov_strong_field_and_complete_restart",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "tesseract_tov_fp64.slang",
+        "tesseract_nr/vulkan_tov.py",
+        "run_vulkan_tov.ps1"
+      ]
+    },
+    {
+      "artifacts": {
+        "vulkan_isolated_ctt_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "resident_vulkan",
+      "id": "resident_isolated_ctt_constraints",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "tesseract_ctt_fp64.slang",
+        "tesseract_nr/vulkan_ctt.py",
+        "run_vulkan_isolated_ctt.ps1"
+      ]
+    },
+    {
+      "artifacts": {
+        "tesseract_nr_constrained_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "tesseract_nr_convergence_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "tesseract_nr_frontier_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        },
+        "tesseract_nr_shock_results.json": {
+          "passes": true,
+          "status_field": "qualified"
+        }
+      },
+      "execution_mode": "retained_cpu_oracle_and_postprocessing",
+      "id": "python_reference_engine_diagnostics_io_and_visualization",
+      "missing_paths": [],
+      "qualified": true,
+      "required_paths": [
+        "run_tesseract_nr.py",
+        "run_tesseract_nr_constrained.py",
+        "run_tesseract_nr_convergence.py",
+        "run_tesseract_nr_frontier.py",
+        "run_tesseract_nr_shocks.py",
+        "tesseract_nr/backend.py",
+        "tesseract_nr/kkt_horizon.py",
+        "tesseract_nr/amr.py",
+        "tesseract_nr/boundary.py",
+        "tesseract_nr/tov.py",
+        "tesseract_nr/io.py",
+        "tesseract_nr/nr_diagnostics.py",
+        "tesseract_full_stack_visualizer.py",
+        "visualize_tesseract.py",
+        "run_tesseract.py",
+        "run.ps1",
+        "run_visualization.ps1"
+      ]
+    }
+  ],
+  "implementation_sha256": {
+    "run_vulkan_original_workflows.py": "305dc636cd5a05690a04fc615e8b875caf7fef48278b5c0227a133a6249005bf",
+    "run_vulkan_parity.py": "8919b3072c5ef275e2e3d8dd122be025ddb326e4149caccb644f44fc9633b6ff",
+    "tesseract_cmc_fp64.slang": "0f49a90752249431b68e69e6c6f7d89379b7fa8ff8d307221540c9edfad46396",
+    "tesseract_ctt_fp64.slang": "dc405c7a5f5ce3437e9facfbd2235c2e7172ddff443ed6f2f723d65d2a7153a9",
+    "tesseract_nr/vulkan_amr.py": "3bd863d3ddac080e5a8cc108332b1ec3e60588d0891891ef25ea31d31ae6eb71",
+    "tesseract_nr/vulkan_backend.py": "7a87604955cfdcf6421e4e8b4442196bad6c0011ee5b8cba77d038d1f1abd5ce",
+    "tesseract_nr/vulkan_boundary.py": "d9302574299bc048d64572c375cc1d3aef66dba87763aee2c5f241d9b8c32b84",
+    "tesseract_nr/vulkan_ctt.py": "9b4b05105d6b7bf40846e24b666bcf2c5d3132b310add149dc1bcef64ab69714",
+    "tesseract_nr/vulkan_frontier.py": "27e31b82f8c1adf391db3d50cbeb4fdda70c9b362c8cf947e7c348c39a123a23",
+    "tesseract_nr/vulkan_parity.py": "2a860086f50b07c3bf37621d5afd0882e8dd768afdf9f39ce18075f80401c734",
+    "tesseract_nr/vulkan_tov.py": "a44ababa9b5e6662bc8bba31e03aeee7b5bf2431b86a5e32cb60bd9396291002",
+    "tesseract_nr/vulkan_validation.py": "3c15d0c88eb2942f06a0903d050822e0509aeab4573d26854252065e301cc971",
+    "tesseract_nr_gpu.slang": "7c9e08539c7b2e9667858fd38051d27f07896176a2bf98a5ff496cb8f11b1bbf",
+    "tesseract_tov_fp64.slang": "cdb7028520112391727ff46dbaf5f75a22a7f3d9f92c1eb9f7bba4223413fc09",
+    "theory33_frozen_variants.json": "8ab3e8359686441402d3454fe3949af3642399d8a9e38145fed29299b01cf8a9",
+    "theory33_qualified_frozen.slang": "10c3cf40409107790640984e8fd397286f112f570253f7c063f63612a98397e1"
+  },
+  "qualification": {
+    "all_resident_artifacts_are_qualified": true,
+    "computational_source_copy_matches_reference": true,
+    "every_declared_capability_has_evidence": true,
+    "implementation_manifest_is_complete": true,
+    "retained_original_surfaces_are_present": true
+  },
+  "qualified": true,
+  "reference_source_audit": {
+    "checked": true,
+    "content_mismatches": [],
+    "files_compared": 75,
+    "identical": true,
+    "missing_files": [],
+    "reference_root": "F:\\FORGE\\Tools\\TESSERACT"
+  },
+  "schema": "vulkan-tesseract.capability-parity.v1",
+  "scope": "All original computational capabilities, separated into resident Vulkan execution and intentionally retained offline training/oracle/postprocessing surfaces."
+}

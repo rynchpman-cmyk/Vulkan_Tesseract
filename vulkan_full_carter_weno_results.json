@@ -1,0 +1,72 @@
+{
+  "backend": "Slang/Vulkan",
+  "cfl": 0.1,
+  "diagnostics": [
+    {
+      "host_reads_during_evolution": 0,
+      "invalid_eigensystems": 0,
+      "maximum_recovery_residual": 6.575464226443728e-07,
+      "points": 16,
+      "recovery_failures": 0
+    },
+    {
+      "host_reads_during_evolution": 0,
+      "invalid_eigensystems": 0,
+      "maximum_recovery_residual": 5.527888333745068e-07,
+      "points": 32,
+      "recovery_failures": 0
+    },
+    {
+      "host_reads_during_evolution": 0,
+      "invalid_eigensystems": 0,
+      "maximum_recovery_residual": 5.529805662263243e-07,
+      "points": 64,
+      "recovery_failures": 0
+    }
+  ],
+  "extended_fields": [
+    "entropy",
+    "tracer"
+  ],
+  "final_time": 0.005,
+  "observed_orders": [
+    2.0069908831844616
+  ],
+  "physical_fields": 9,
+  "qualification": {
+    "all_eigensystems_valid": true,
+    "all_recoveries_valid": true,
+    "device_resident_between_snapshots": true,
+    "full_weno_rhs_matches_float64_oracle": true,
+    "smooth_evolution_converges": true
+  },
+  "qualified": true,
+  "reconstruction": "full_carter_weno5_z",
+  "resolutions": [
+    16,
+    32,
+    64
+  ],
+  "rhs_audits": [
+    {
+      "maximum_absolute_error": 2.6646805162330867e-06,
+      "points": 16,
+      "rms_error": 4.01735129058799e-07
+    },
+    {
+      "maximum_absolute_error": 4.798634767114174e-06,
+      "points": 32,
+      "rms_error": 6.769952833810361e-07
+    },
+    {
+      "maximum_absolute_error": 6.134583826783446e-06,
+      "points": 64,
+      "rms_error": 7.516307193753523e-07
+    }
+  ],
+  "schema": "vulkan-tesseract.full-carter-weno5-z.v1",
+  "successive_l1_errors": [
+    5.9695414771946766e-05,
+    1.485171194164852e-05
+  ]
+}

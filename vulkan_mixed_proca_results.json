@@ -1,0 +1,70 @@
+{
+  "backend": "Slang/Vulkan",
+  "coupled_stack": {
+    "backend": "Slang/Vulkan",
+    "dt": 1e-07,
+    "geometry_step_absolute_error": 1.5079644068550353e-11,
+    "host_reads_during_evolution": 0,
+    "initial_matter_absolute_error": 1.4478689691621582e-08,
+    "invalid_recoveries": 0,
+    "matter_step_absolute_error": 1.4478689691621582e-08,
+    "maximum_recovery_residual": 6.651491446518776e-08,
+    "maximum_vector_state_change": 2.590000214297561e-09,
+    "points": 8,
+    "qualification": {
+      "geometry_step_matches_cpu": true,
+      "initial_total_state_matches_cpu": true,
+      "matter_step_matches_cpu": true,
+      "recovery_valid": true,
+      "step_is_device_resident": true,
+      "vector_state_is_dynamical": true,
+      "vector_step_matches_cpu": true
+    },
+    "qualified": true,
+    "schedule": "CCZ4/Proca/Carter/Proca/CCZ4 symmetric split",
+    "schema": "vulkan-tesseract.evolved-coupled-stack.v1",
+    "vector_step_absolute_error": 6.986285248228308e-11
+  },
+  "qualification": {
+    "coupled_geometry_step_matches_cpu": true,
+    "coupled_initial_total_state_matches_cpu": true,
+    "coupled_matter_step_matches_cpu": true,
+    "coupled_recovery_valid": true,
+    "coupled_step_is_device_resident": true,
+    "coupled_vector_state_is_dynamical": true,
+    "coupled_vector_step_matches_cpu": true,
+    "subsystem_evolution_is_device_resident": true,
+    "subsystem_gauss_constraints_remain_controlled": true,
+    "subsystem_magnetic_fields_are_derived_on_device": true,
+    "subsystem_mixed_proca_rhs_matches_float64_oracle": true,
+    "subsystem_ssprk3_evolution_matches_float64_oracle": true
+  },
+  "qualified": true,
+  "schema": "vulkan-tesseract.mixed-proca-frontier.v1",
+  "subsystem": {
+    "backend": "Slang/Vulkan",
+    "dt": 0.0002,
+    "dynamic_fields": "a_i,pi_A^i,b_i,pi_B^i,Q_A,Q_B,clean_A,clean_B",
+    "evolution_rms_error": 1.3854670430943512e-10,
+    "host_reads_during_evolution": 0,
+    "maximum_evolution_absolute_error": 1.315395647440154e-09,
+    "maximum_gauss_constraint": 5.169538781046867e-06,
+    "maximum_magnetic_absolute_error": 4.999027311894388e-10,
+    "maximum_rhs_absolute_error": 1.4914361703977086e-08,
+    "qualification": {
+      "evolution_is_device_resident": true,
+      "gauss_constraints_remain_controlled": true,
+      "magnetic_fields_are_derived_on_device": true,
+      "mixed_proca_rhs_matches_float64_oracle": true,
+      "ssprk3_evolution_matches_float64_oracle": true
+    },
+    "qualified": true,
+    "rhs_rms_error": 2.1673492960770634e-09,
+    "schema": "vulkan-tesseract.mixed-proca-evolution.v1",
+    "shape": [
+      8,
+      8
+    ],
+    "steps": 4
+  }
+}
