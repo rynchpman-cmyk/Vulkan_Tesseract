@@ -24,6 +24,12 @@ $Python = Join-Path $RepoRoot ".venv-slang\Scripts\python.exe"
 if (-not (Test-Path $Python)) {
     throw "Missing .venv-slang. Install requirements-slang.txt first."
 }
+$OutputPath = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
+    $OutputDirectory
+}
+else {
+    Join-Path $RepoRoot $OutputDirectory
+}
 
 $Arguments = @(
     (Join-Path $RepoRoot "run_vulkan_puncture_mots.py"),
@@ -38,10 +44,16 @@ $Arguments = @(
     "--individual-maximum-degree", $IndividualMaximumDegree,
     "--maximum-iterations", $MaximumIterations,
     "--expansion-tolerance", $ExpansionTolerance,
-    "--output-directory", (Join-Path $RepoRoot $OutputDirectory)
+    "--output-directory", $OutputPath
 )
 if ($RestartFrom) {
-    $Arguments += @("--restart-from", (Join-Path $RepoRoot $RestartFrom))
+    $RestartPath = if ([System.IO.Path]::IsPathRooted($RestartFrom)) {
+        $RestartFrom
+    }
+    else {
+        Join-Path $RepoRoot $RestartFrom
+    }
+    $Arguments += @("--restart-from", $RestartPath)
 }
 if ($PlanOnly) {
     $Arguments += "--plan-only"
@@ -57,3 +69,4 @@ if ($SaveSnapshots) {
 }
 
 & $Python @Arguments
+exit $LASTEXITCODE

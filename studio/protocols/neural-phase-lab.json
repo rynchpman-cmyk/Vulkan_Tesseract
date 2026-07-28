@@ -1,0 +1,54 @@
+{
+  "schema": "vulkan-tesseract.lab-protocol.v1",
+  "id": "neural-phase",
+  "title": "Neural Phase Collision",
+  "summary": "Full Carter Roe evolution across the learned constitutive phase boundary.",
+  "runner": "neural_phase",
+  "visualizer": "phase",
+  "accent": "#f472d0",
+  "estimated_seconds": 180,
+  "minimum_vram_gib": 2,
+  "fixed_arguments": [
+    "-SkipSetup"
+  ],
+  "output": {
+    "option": "-Output",
+    "name": "neural_phase_results.json"
+  },
+  "parameters": [
+    {
+      "key": "resolutions",
+      "label": "Resolution ladder",
+      "option": "-Resolutions",
+      "type": "factor_two_csv",
+      "default": "16,32,64,128",
+      "minimum_items": 3,
+      "minimum": 16,
+      "maximum": 256,
+      "help": "At least three factor-two levels. The reference-qualified ladder is 16,32,64,128."
+    },
+    {
+      "key": "final_time",
+      "label": "Final simulation time",
+      "option": "-FinalTime",
+      "type": "float",
+      "default": 0.02,
+      "minimum": 0.001,
+      "maximum": 0.1,
+      "step": 0.001,
+      "help": "The tracked phase-crossing reference is qualified at 0.02."
+    },
+    {
+      "key": "cfl",
+      "label": "CFL number",
+      "option": "-Cfl",
+      "type": "float",
+      "default": 0.12,
+      "minimum": 0.02,
+      "maximum": 0.2,
+      "step": 0.01,
+      "help": "Smaller values take more steps and are generally more conservative."
+    }
+  ],
+  "qualification_note": "Only 16,32,64,128 at t=0.02 is expected to reproduce the tracked 0,0,0,4 phase-change reference pattern."
+}

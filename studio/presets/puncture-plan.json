@@ -1,0 +1,31 @@
+{
+  "schema": "vulkan-tesseract.studio-preset.v1",
+  "id": "puncture-plan",
+  "title": "Black-Hole Preflight",
+  "eyebrow": "SAFE INSTANT CHECK",
+  "summary": "Validate the production collision grid, memory, and 16-cell horizon gate.",
+  "what_you_will_see": "The exact N=120 production contract without allocating the GPU or starting a long run.",
+  "runner": "puncture_mots",
+  "arguments": [
+    "-Resolution",
+    "120",
+    "-BoxLength",
+    "3",
+    "-Steps",
+    "500",
+    "-PlanOnly",
+    "-OutputDirectory",
+    "{job_dir}/puncture_plan"
+  ],
+  "duration_label": "A few seconds",
+  "estimated_seconds": 5,
+  "minimum_vram_gib": 0,
+  "disk_label": "Under 1 MB",
+  "tier": "instant",
+  "visualizer": "puncture",
+  "accent": "#fbbf24",
+  "total_steps": null,
+  "result_files": [
+    "puncture_plan/configuration.json"
+  ]
+}

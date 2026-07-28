@@ -11,9 +11,16 @@ $Python = Join-Path $RepoRoot ".venv-slang\Scripts\python.exe"
 if (-not (Test-Path $Python)) {
     throw "Missing .venv-slang. Install requirements-slang.txt first."
 }
+$OutputPath = if ([System.IO.Path]::IsPathRooted($Output)) {
+    $Output
+}
+else {
+    Join-Path $RepoRoot $Output
+}
 
 & $Python (Join-Path $RepoRoot "run_vulkan_multidimensional.py") `
     --nx $Nx `
     --ny $Ny `
     --steps $Steps `
-    --output (Join-Path $RepoRoot $Output)
+    --output $OutputPath
+exit $LASTEXITCODE

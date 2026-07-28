@@ -78,6 +78,7 @@ py-modules = [
     "theory33_hybrid",
     "theory33_kinetic_data",
     "tesseract_full_stack_visualizer",
+    "tesseract_studio",
     "train_hybrid",
     "train_lyapunov_conditioned",
     "visualize_tesseract",

@@ -1,0 +1,31 @@
+{
+  "schema": "vulkan-tesseract.studio-preset.v1",
+  "id": "neural-phase-collision",
+  "title": "Neural Phase Collision",
+  "eyebrow": "QUICK EXPERIMENT",
+  "summary": "Collide two learned constitutive phases with the full Carter Roe interface.",
+  "what_you_will_see": "Two states meet, switch phase, and propagate through the neural constitutive model.",
+  "runner": "neural_phase",
+  "arguments": [
+    "-Resolutions",
+    "16,32,64,128",
+    "-FinalTime",
+    "0.02",
+    "-Cfl",
+    "0.12",
+    "-SkipSetup",
+    "-Output",
+    "{job_dir}/neural_phase_results.json"
+  ],
+  "duration_label": "About 1–5 minutes",
+  "estimated_seconds": 180,
+  "minimum_vram_gib": 2,
+  "disk_label": "Under 20 MB",
+  "tier": "quick",
+  "visualizer": "phase",
+  "accent": "#f472d0",
+  "total_steps": null,
+  "result_files": [
+    "neural_phase_results.json"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema": "vulkan-tesseract.lab-protocol.v1",
+  "id": "spacetime",
+  "title": "Coupled Neural Spacetime",
+  "summary": "Multidimensional Carter, mixed-vector, and CCZ4 evolution on Vulkan.",
+  "runner": "multidimensional",
+  "visualizer": "spacetime",
+  "accent": "#a78bfa",
+  "estimated_seconds": 120,
+  "minimum_vram_gib": 2,
+  "fixed_arguments": [],
+  "output": {
+    "option": "-Output",
+    "name": "spacetime_results.json"
+  },
+  "total_steps_parameter": "steps",
+  "parameters": [
+    {
+      "key": "nx",
+      "label": "Grid cells X",
+      "option": "-Nx",
+      "type": "integer",
+      "default": 8,
+      "minimum": 4,
+      "maximum": 128,
+      "step": 1,
+      "help": "X resolution of the resident Cartesian grid."
+    },
+    {
+      "key": "ny",
+      "label": "Grid cells Y",
+      "option": "-Ny",
+      "type": "integer",
+      "default": 8,
+      "minimum": 1,
+      "maximum": 128,
+      "step": 1,
+      "help": "Use 1 for a longitudinal slice or 8+ for multidimensional evolution."
+    },
+    {
+      "key": "steps",
+      "label": "Evolution steps",
+      "option": "-Steps",
+      "type": "integer",
+      "default": 2,
+      "minimum": 1,
+      "maximum": 512,
+      "step": 1,
+      "help": "Number of complete coupled split steps."
+    }
+  ],
+  "qualification_note": "The tracked control is 8 x 8 for two steps. Larger grids and horizons are exploratory until separately qualified."
+}

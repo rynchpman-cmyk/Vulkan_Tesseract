@@ -3,7 +3,8 @@ param(
     [double]$FinalTime = 0.02,
     [double]$Cfl = 0.12,
     [string]$Reference = "tesseract_neural_phase_riemann_results.json",
-    [string]$Output = "vulkan_original_neural_phase_full_roe_results.json"
+    [string]$Output = "vulkan_original_neural_phase_full_roe_results.json",
+    [switch]$SkipSetup
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,10 +15,12 @@ if (-not (Test-Path -LiteralPath $python)) {
     python -m venv (Join-Path $projectDir ".venv-slang")
 }
 
-& $python -m pip install --disable-pip-version-check --quiet `
-    -r (Join-Path $projectDir "requirements-slang.txt")
-if ($LASTEXITCODE -ne 0) {
-    throw "SlangPy environment setup failed with exit code $LASTEXITCODE."
+if (-not $SkipSetup) {
+    & $python -m pip install --disable-pip-version-check --quiet `
+        -r (Join-Path $projectDir "requirements-slang.txt")
+    if ($LASTEXITCODE -ne 0) {
+        throw "SlangPy environment setup failed with exit code $LASTEXITCODE."
+    }
 }
 
 & $python `

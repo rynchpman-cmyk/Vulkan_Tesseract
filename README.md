@@ -19,6 +19,43 @@ restart. The exact execution boundary and evidence are in the
 
 ![Vulkan Tesseract neural spacetime dashboard](tesseract_full_stack_dashboard.png)
 
+## Tesseract Studio
+
+Tesseract Studio is the beginner-facing control room for the solver. It turns
+the existing qualified PowerShell campaigns into named, allow-listed presets
+with an animated spacetime view, live progress, plain-language status,
+estimated time remaining, logs, artifacts, and safe stop/resume controls.
+There is no command prompt to operate after setup.
+
+**Advanced Mode** expands the same application into Tesseract Laboratory:
+typed experiment design, custom validated launches, exact command previews,
+a live Tesseract terminal, streamed runner output, run telemetry, artifact
+indexing, qualification matrices, numerical metrics, convergence charts,
+provenance, and raw JSON evidence.
+
+For a fresh checkout, double-click **Setup Tesseract Studio** once. Then
+double-click:
+
+```text
+Launch Tesseract Studio.cmd
+```
+
+Or launch it from PowerShell:
+
+```powershell
+.\run_tesseract_studio.ps1
+```
+
+The browser interface opens locally at `http://127.0.0.1:8765`. Try the
+**Full-Stack Visual Tour** first, then **Spacetime Smoke Test**. The
+**Twin Black-Hole Collision** preset is the qualified `N=120`, length-3,
+500-step production contract and may run for roughly a day. Its checkpoint is
+rolling, so ten observation intervals do not create ten separate 153 MB
+archives.
+
+See the [Tesseract Studio guide](docs/TESSERACT_STUDIO.md) for the preset
+catalog, safety boundary, and developer contract.
+
 ## Current GPU milestone
 
 The resident multidimensional engine advances:
@@ -222,6 +259,10 @@ See [architecture](docs/ARCHITECTURE.md) and
 | `VULKAN_*_REPORT.md` | Scope, measurements, reproduction, and honest boundaries |
 | `tesseract_full_stack_visualizer.py` | Neural-spacetime dashboard renderer |
 | `tesseract_full_stack_dashboard.png` | Repository dashboard image |
+| `tesseract_studio.py` | Local preset controller, job monitor, and HTTP API |
+| `studio/` | Beginner-facing dashboard assets and declarative preset manifests |
+| `studio/protocols/` | Typed Advanced Mode experiment and parameter contracts |
+| `Launch Tesseract Studio.cmd` | Double-click Windows launcher |
 | `docs/` | Vulkan architecture, reproduction, oracle, and publishing guides |
 
 ## Validation
@@ -229,7 +270,7 @@ See [architecture](docs/ARCHITECTURE.md) and
 CPU-safe repository and oracle checks:
 
 ```powershell
-python -m pytest tests\nr tests\test_artifacts.py -q
+python -m pytest tests\nr tests\test_artifacts.py tests\test_studio.py -q
 ```
 
 All live Vulkan regressions:
@@ -281,6 +322,7 @@ Exact environments, generated artifacts, and campaign commands are listed in
 ## Documentation
 
 - [Documentation index](docs/INDEX.md)
+- [Tesseract Studio](docs/TESSERACT_STUDIO.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Reproducibility](docs/REPRODUCIBILITY.md)
 - [CPU numerical-relativity oracle](docs/NR_PDE_SOLVER.md)

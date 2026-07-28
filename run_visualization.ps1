@@ -6,17 +6,20 @@ param(
     [int]$SpacetimePoints = 24,
     [string]$Output = "",
     [switch]$Fast,
-    [switch]$NoShow
+    [switch]$NoShow,
+    [switch]$SkipSetup
 )
 
 $ErrorActionPreference = 'Stop'
 $projectDir = $PSScriptRoot
 $python = Join-Path $projectDir '.venv-slang\Scripts\python.exe'
 
-& $python -m pip install --disable-pip-version-check --quiet `
-    -r (Join-Path $projectDir 'requirements-slang.txt')
-if ($LASTEXITCODE -ne 0) {
-    throw "Visualization environment setup failed with exit code $LASTEXITCODE."
+if (-not $SkipSetup) {
+    & $python -m pip install --disable-pip-version-check --quiet `
+        -r (Join-Path $projectDir 'requirements-slang.txt')
+    if ($LASTEXITCODE -ne 0) {
+        throw "Visualization environment setup failed with exit code $LASTEXITCODE."
+    }
 }
 
 if ($Mode -eq "literal") {

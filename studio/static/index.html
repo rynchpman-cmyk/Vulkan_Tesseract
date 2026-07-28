@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050814">
+  <title>Tesseract Studio</title>
+  <link rel="stylesheet" href="/static/studio.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Tesseract Studio home">
+      <span class="brand-mark" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </span>
+      <span>
+        <strong>TESSERACT</strong>
+        <small>STUDIO</small>
+      </span>
+    </a>
+    <div class="topbar-actions">
+      <button id="advancedToggle" class="text-button" type="button">
+        <span class="toggle-dot"></span>
+        Advanced mode
+      </button>
+      <div id="systemBadge" class="system-badge checking">
+        <span></span>
+        Checking system
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker">
+          <span>LOCAL VULKAN ENGINE</span>
+          <span class="kicker-line"></span>
+          <span>NO TERMINAL REQUIRED</span>
+        </div>
+        <h1>Turn your gaming PC into a <em>neural spacetime simulator.</em></h1>
+        <p>
+          Pick an experiment. Tesseract handles the physics, GPU setup,
+          checkpoints, and results.
+        </p>
+        <div class="hero-actions">
+          <button id="exploreButton" class="primary-button" type="button">
+            Explore experiments
+            <span aria-hidden="true">↓</span>
+          </button>
+          <button id="demoButton" class="secondary-button" type="button">
+            How does this work?
+          </button>
+        </div>
+      </div>
+
+      <div class="viewport-shell">
+        <div class="viewport-head">
+          <div>
+            <span class="live-dot"></span>
+            <span id="viewportLabel">SPACETIME VIEWPORT</span>
+          </div>
+          <div id="viewportClock">READY</div>
+        </div>
+        <canvas id="spacetimeCanvas" aria-label="Animated spacetime visualization"></canvas>
+        <div class="viewport-overlay">
+          <div class="coordinate-tag tag-x">X</div>
+          <div class="coordinate-tag tag-y">Y</div>
+          <div class="coordinate-tag tag-z">Z</div>
+          <div id="viewportCaption" class="viewport-caption">
+            <span>QUALIFIED STACK</span>
+            <strong>Waiting for an experiment</strong>
+          </div>
+        </div>
+        <div class="viewport-scanline"></div>
+      </div>
+    </section>
+
+    <section id="experiments" class="experiments-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-index">01</span>
+          <div>
+            <p>CHOOSE AN EXPERIENCE</p>
+            <h2>Presets that just work.</h2>
+          </div>
+        </div>
+        <p class="section-note">
+          Start small or launch the full research campaign. Every card uses
+          a tested Tesseract runner.
+        </p>
+      </div>
+      <div id="presetGrid" class="preset-grid" aria-live="polite">
+        <div class="preset-skeleton"></div>
+        <div class="preset-skeleton"></div>
+        <div class="preset-skeleton"></div>
+      </div>
+    </section>
+
+    <section id="runDeck" class="run-deck hidden" aria-live="polite">
+      <div class="run-summary">
+        <div class="run-title-row">
+          <div>
+            <span id="runEyebrow" class="run-eyebrow">EXPERIMENT</span>
+            <h2 id="runTitle">Tesseract experiment</h2>
+          </div>
+          <div id="runStateBadge" class="run-state idle">IDLE</div>
+        </div>
+
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+          <div class="progress-glow"></div>
+        </div>
+        <div class="progress-meta">
+          <strong id="progressLabel">0%</strong>
+          <span id="stepLabel">Preparing</span>
+          <span id="etaLabel">—</span>
+        </div>
+
+        <div class="status-message">
+          <span class="status-pulse"></span>
+          <span id="statusMessage">Choose an experiment to begin.</span>
+        </div>
+
+        <div class="run-controls">
+          <button id="cancelButton" class="danger-button" type="button">
+            Stop run
+          </button>
+          <button id="openOutputButton" class="secondary-button" type="button">
+            Open results
+          </button>
+          <button id="collapseRunButton" class="text-button" type="button">
+            Hide panel
+          </button>
+        </div>
+      </div>
+
+      <div class="telemetry-panel">
+        <div class="telemetry-grid">
+          <div class="telemetry-card">
+            <span>ELAPSED</span>
+            <strong id="elapsedValue">00:00</strong>
+          </div>
+          <div class="telemetry-card">
+            <span>SIMULATION TIME</span>
+            <strong id="simTimeValue">—</strong>
+          </div>
+          <div class="telemetry-card">
+            <span>CHECKPOINT</span>
+            <strong id="checkpointValue">Watching</strong>
+          </div>
+          <div class="telemetry-card">
+            <span>ENGINE</span>
+            <strong>Vulkan</strong>
+          </div>
+        </div>
+        <div class="event-console advanced-only">
+          <div class="console-head">
+            <span>LIVE EVENT STREAM</span>
+            <span id="eventCount">0 EVENTS</span>
+          </div>
+          <div id="eventLog" class="event-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="laboratory" class="laboratory advanced-only">
+      <div class="lab-heading">
+        <div>
+          <span class="section-index">LAB</span>
+          <div>
+            <p>ADVANCED RESEARCH WORKBENCH</p>
+            <h2>Tesseract Laboratory.</h2>
+          </div>
+        </div>
+        <div class="lab-status">
+          <span class="live-dot"></span>
+          <div>
+            <strong id="labStatusTitle">CONTROL PLANE READY</strong>
+            <small id="labStatusDetail">Validated commands only</small>
+          </div>
+        </div>
+      </div>
+
+      <nav class="lab-tabs" aria-label="Laboratory views">
+        <button class="lab-tab active" data-lab-tab="control" type="button">
+          <span>01</span> Run control
+        </button>
+        <button class="lab-tab" data-lab-tab="terminal" type="button">
+          <span>02</span> Live terminal
+        </button>
+        <button class="lab-tab" data-lab-tab="results" type="button">
+          <span>03</span> Evidence lab
+        </button>
+      </nav>
+
+      <div class="lab-panel active" data-lab-panel="control">
+        <div class="lab-control-grid">
+          <article class="lab-module protocol-module">
+            <div class="module-head">
+              <div>
+                <span>EXPERIMENT DESIGNER</span>
+                <h3>Configure a protocol</h3>
+              </div>
+              <span class="module-index">A</span>
+            </div>
+            <label class="lab-field protocol-select">
+              <span>PROTOCOL</span>
+              <select id="protocolSelect"></select>
+            </label>
+            <p id="protocolSummary" class="protocol-summary"></p>
+            <div id="parameterGrid" class="parameter-grid"></div>
+            <div class="qualification-note">
+              <span>QUALIFICATION BOUNDARY</span>
+              <p id="qualificationNote"></p>
+            </div>
+            <div class="command-preview">
+              <div>
+                <span>VALIDATED COMMAND PREVIEW</span>
+                <button id="copyCommandButton" type="button">COPY</button>
+              </div>
+              <code id="commandPreview">Select a protocol</code>
+            </div>
+            <div class="lab-actions">
+              <button id="labLaunchButton" class="primary-button" type="button">
+                Launch custom run <span>→</span>
+              </button>
+              <button id="labResetButton" class="secondary-button" type="button">
+                Restore defaults
+              </button>
+            </div>
+          </article>
+
+          <aside class="lab-module run-intelligence">
+            <div class="module-head">
+              <div>
+                <span>RUN INTELLIGENCE</span>
+                <h3>Before launch</h3>
+              </div>
+              <span class="module-index">B</span>
+            </div>
+            <div class="intelligence-orbit" aria-hidden="true">
+              <i></i><i></i><i></i>
+              <strong id="intelligenceCore">GPU</strong>
+            </div>
+            <dl class="intelligence-list">
+              <div><dt>Runner</dt><dd id="labRunner">—</dd></div>
+              <div><dt>Estimated wall time</dt><dd id="labEstimate">—</dd></div>
+              <div><dt>Minimum VRAM</dt><dd id="labVram">—</dd></div>
+              <div><dt>Execution policy</dt><dd>One managed process</dd></div>
+              <div><dt>Output</dt><dd>Isolated job workspace</dd></div>
+            </dl>
+            <div class="safety-contract">
+              <span>CONTROL BOUNDARY</span>
+              <p>
+                Parameters are typed and range-checked. Paths and executables
+                remain locked to repository-owned runners.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div class="lab-panel" data-lab-panel="terminal">
+        <article class="lab-module terminal-module">
+          <div class="terminal-toolbar">
+            <div>
+              <span class="terminal-lights"><i></i><i></i><i></i></span>
+              <strong>TESSERACT LAB CONSOLE</strong>
+            </div>
+            <span id="terminalConnection">LOCAL / CONNECTED</span>
+          </div>
+          <div id="labTerminalLog" class="lab-terminal-log" aria-live="polite">
+            <div class="terminal-row system">
+              <span>system</span>
+              <code>Advanced laboratory online. Enter <b>help</b> for commands.</code>
+            </div>
+          </div>
+          <form id="terminalForm" class="terminal-input-row">
+            <span>λ</span>
+            <input id="terminalInput" autocomplete="off" spellcheck="false"
+              aria-label="Tesseract laboratory command"
+              placeholder="run spacetime nx=8 ny=8 steps=2">
+            <button type="submit">EXECUTE</button>
+          </form>
+          <div class="terminal-shortcuts">
+            <button type="button" data-command="status">status</button>
+            <button type="button" data-command="protocols">protocols</button>
+            <button type="button" data-command="results">results</button>
+            <button type="button" data-command="help">help</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="lab-panel" data-lab-panel="results">
+        <div class="evidence-toolbar">
+          <label class="lab-field">
+            <span>JSON EVIDENCE</span>
+            <select id="resultSelect">
+              <option value="">Choose a completed result</option>
+            </select>
+          </label>
+          <button id="refreshResultsButton" class="secondary-button" type="button">
+            Refresh index
+          </button>
+          <button id="copyJsonButton" class="secondary-button" type="button" disabled>
+            Copy JSON
+          </button>
+        </div>
+
+        <div id="evidenceEmpty" class="evidence-empty">
+          <span class="evidence-glyph">Σ</span>
+          <h3>Select an evidence file</h3>
+          <p>
+            Studio indexes completed laboratory runs and tracked qualification
+            records without changing their source JSON.
+          </p>
+        </div>
+
+        <div id="evidenceDashboard" class="evidence-dashboard hidden">
+          <div class="evidence-hero">
+            <div>
+              <span id="evidenceSchema">SCHEMA</span>
+              <h3 id="evidenceTitle">Evidence</h3>
+              <p id="evidencePath"></p>
+            </div>
+            <div id="qualificationSeal" class="qualification-seal">
+              <strong>—</strong><span>QUALIFICATION</span>
+            </div>
+          </div>
+
+          <div id="evidenceKpis" class="evidence-kpis"></div>
+
+          <div class="evidence-grid">
+            <article class="lab-module qualification-module">
+              <div class="module-head">
+                <div><span>GATE MATRIX</span><h3>Qualification</h3></div>
+                <strong id="gateScore">—</strong>
+              </div>
+              <div id="qualificationGrid" class="qualification-grid"></div>
+            </article>
+
+            <article class="lab-module provenance-module">
+              <div class="module-head">
+                <div><span>CHAIN OF CUSTODY</span><h3>Provenance</h3></div>
+              </div>
+              <dl id="provenanceList" class="provenance-list"></dl>
+            </article>
+          </div>
+
+          <article class="lab-module convergence-module">
+            <div class="module-head">
+              <div><span>NUMERICAL SERIES</span><h3>Convergence and ladders</h3></div>
+              <div class="chart-controls">
+                <select id="seriesSelect"></select>
+                <select id="metricSelect"></select>
+              </div>
+            </div>
+            <div class="chart-shell">
+              <canvas id="evidenceChart" aria-label="Evidence series chart"></canvas>
+              <div id="chartEmpty" class="chart-empty">No plottable ladder in this result.</div>
+            </div>
+            <div class="table-shell">
+              <table id="seriesTable"></table>
+            </div>
+          </article>
+
+          <details class="raw-evidence lab-module">
+            <summary>Raw JSON evidence</summary>
+            <pre id="rawJson"></pre>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="system-section">
+      <div class="section-heading compact">
+        <div>
+          <span class="section-index">02</span>
+          <div>
+            <p>AUTOMATIC PREFLIGHT</p>
+            <h2>Your launch pad.</h2>
+          </div>
+        </div>
+      </div>
+      <div id="preflightGrid" class="preflight-grid">
+        <div class="preflight-card">
+          <span class="preflight-icon">◌</span>
+          <div><strong>Checking</strong><small>Inspecting this PC</small></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>
+      <strong>TESSERACT STUDIO</strong>
+      <span>Local control surface • Physics stays on your machine</span>
+    </div>
+    <span id="footerMode">LIVE RUNNERS</span>
+  </footer>
+
+  <dialog id="presetDialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <span id="dialogEyebrow" class="dialog-eyebrow">EXPERIMENT</span>
+      <h2 id="dialogTitle">Experiment</h2>
+      <p id="dialogSummary"></p>
+      <div class="expectation">
+        <span>WHAT YOU’LL SEE</span>
+        <p id="dialogExpectation"></p>
+      </div>
+      <div class="dialog-facts">
+        <div><span>TIME</span><strong id="dialogDuration">—</strong></div>
+        <div><span>VRAM</span><strong id="dialogVram">—</strong></div>
+        <div><span>DISK</span><strong id="dialogDisk">—</strong></div>
+      </div>
+      <div class="advanced advanced-only">
+        <span>SCIENCE CONTRACT</span>
+        <p id="dialogAdvanced">
+          Exact settings are locked by the selected preset manifest.
+        </p>
+      </div>
+      <div class="dialog-actions">
+        <button id="resumeButton" class="secondary-button hidden" value="cancel" type="button">
+          Resume checkpoint
+        </button>
+        <button id="startButton" class="primary-button" value="cancel" type="button">
+          Start experiment
+          <span>→</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="infoDialog">
+    <form method="dialog" class="dialog-card info-card">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <span class="dialog-eyebrow">THREE SIMPLE LAYERS</span>
+      <h2>The interface is simple. The engine isn’t.</h2>
+      <ol class="info-steps">
+        <li><span>1</span><div><strong>Choose</strong><p>Select a tested physics preset.</p></div></li>
+        <li><span>2</span><div><strong>Watch</strong><p>Follow live progress and visual telemetry.</p></div></li>
+        <li><span>3</span><div><strong>Explore</strong><p>Open the exact scientific results when it finishes.</p></div></li>
+      </ol>
+      <button class="primary-button full" value="cancel">Got it</button>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/static/studio.js"></script>
+</body>
+</html>

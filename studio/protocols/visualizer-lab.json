@@ -1,0 +1,75 @@
+{
+  "schema": "vulkan-tesseract.lab-protocol.v1",
+  "id": "visualizer",
+  "title": "Full-Stack Visualization",
+  "summary": "Render Tesseract evidence and spacetime layers into a dashboard image.",
+  "runner": "visualization",
+  "visualizer": "tesseract",
+  "accent": "#67e8f9",
+  "estimated_seconds": 20,
+  "minimum_vram_gib": 1,
+  "fixed_arguments": [
+    "-NoShow",
+    "-SkipSetup"
+  ],
+  "output": {
+    "option": "-Output",
+    "name": "tesseract_dashboard.png"
+  },
+  "parameters": [
+    {
+      "key": "mode",
+      "label": "Visualization mode",
+      "option": "-Mode",
+      "type": "choice",
+      "default": "full-stack",
+      "choices": [
+        "full-stack",
+        "literal"
+      ],
+      "help": "Full-stack renders tracked evidence; literal also regenerates recurrence shaders."
+    },
+    {
+      "key": "samples",
+      "label": "Signal samples",
+      "option": "-Samples",
+      "type": "integer",
+      "default": 320,
+      "minimum": 64,
+      "maximum": 2048,
+      "step": 16,
+      "help": "Sampling density for plotted recurrence signals."
+    },
+    {
+      "key": "steps",
+      "label": "Recurrence steps",
+      "option": "-Steps",
+      "type": "integer",
+      "default": 64,
+      "minimum": 8,
+      "maximum": 512,
+      "step": 8,
+      "help": "Length of the rendered recurrence trajectory."
+    },
+    {
+      "key": "spacetime_points",
+      "label": "Spacetime points",
+      "option": "-SpacetimePoints",
+      "type": "integer",
+      "default": 24,
+      "minimum": 8,
+      "maximum": 128,
+      "step": 4,
+      "help": "Spatial sampling of the embedded full-stack view."
+    },
+    {
+      "key": "fast",
+      "label": "Fast render",
+      "option": "-Fast",
+      "type": "boolean",
+      "default": true,
+      "help": "Skip the live spacetime pass for a quick static dashboard."
+    }
+  ],
+  "qualification_note": "Visualization consumes evidence; it does not replace the underlying numerical qualification."
+}

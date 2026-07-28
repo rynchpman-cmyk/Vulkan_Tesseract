@@ -82,6 +82,15 @@ class ArtifactTests(unittest.TestCase):
     def test_documented_entrypoints_exist(self) -> None:
         expected = (
             "run_visualization.ps1",
+            "run_tesseract_studio.ps1",
+            "setup_tesseract_studio.ps1",
+            "Launch Tesseract Studio.cmd",
+            "Setup Tesseract Studio.cmd",
+            "tesseract_studio.py",
+            "studio/protocols/neural-phase-lab.json",
+            "studio/protocols/spacetime-lab.json",
+            "studio/protocols/puncture-lab.json",
+            "studio/protocols/visualizer-lab.json",
             "run_vulkan_theory33.ps1",
             "run_vulkan_frozen_neural.ps1",
             "run_vulkan_weno.ps1",
@@ -142,6 +151,7 @@ class ArtifactTests(unittest.TestCase):
             "docs/NR_PDE_SOLVER.md",
             "docs/PUBLISHING.md",
             "docs/REPRODUCIBILITY.md",
+            "docs/TESSERACT_STUDIO.md",
         )
         for relative in expected:
             with self.subTest(path=relative):

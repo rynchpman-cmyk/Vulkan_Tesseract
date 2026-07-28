@@ -1,0 +1,29 @@
+{
+  "schema": "vulkan-tesseract.studio-preset.v1",
+  "id": "full-stack-tour",
+  "title": "Full-Stack Tour",
+  "eyebrow": "INSTANT VISUAL",
+  "summary": "Generate the complete neural-spacetime dashboard from qualified results.",
+  "what_you_will_see": "A publication-grade map of the Carter, neural, constraint, and spacetime layers.",
+  "runner": "visualization",
+  "arguments": [
+    "-Mode",
+    "full-stack",
+    "-Fast",
+    "-NoShow",
+    "-SkipSetup",
+    "-Output",
+    "{job_dir}/tesseract_dashboard.png"
+  ],
+  "duration_label": "About 20 seconds",
+  "estimated_seconds": 20,
+  "minimum_vram_gib": 1,
+  "disk_label": "Under 10 MB",
+  "tier": "instant",
+  "visualizer": "tesseract",
+  "accent": "#67e8f9",
+  "total_steps": null,
+  "result_files": [
+    "tesseract_dashboard.png"
+  ]
+}

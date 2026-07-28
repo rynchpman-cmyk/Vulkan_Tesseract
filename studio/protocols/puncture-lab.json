@@ -1,0 +1,143 @@
+{
+  "schema": "vulkan-tesseract.lab-protocol.v1",
+  "id": "puncture",
+  "title": "Puncture and MOTS Campaign",
+  "summary": "Resident puncture CCZ4 evolution with constrained apparent-horizon observations.",
+  "runner": "puncture_mots",
+  "visualizer": "puncture",
+  "accent": "#fb7185",
+  "estimated_seconds": 86400,
+  "minimum_vram_gib": 3,
+  "fixed_arguments": [],
+  "output": {
+    "option": "-OutputDirectory",
+    "name": "puncture"
+  },
+  "total_steps_parameter": "steps",
+  "parameters": [
+    {
+      "key": "resolution",
+      "label": "Grid resolution",
+      "option": "-Resolution",
+      "type": "integer",
+      "default": 120,
+      "minimum": 16,
+      "maximum": 192,
+      "step": 1,
+      "help": "Production uses N=120 in a length-3 box."
+    },
+    {
+      "key": "box_length",
+      "label": "Box length",
+      "option": "-BoxLength",
+      "type": "float",
+      "default": 3.0,
+      "minimum": 1.0,
+      "maximum": 12.0,
+      "step": 0.1,
+      "help": "Coordinate length of each Cartesian axis."
+    },
+    {
+      "key": "separation",
+      "label": "Puncture separation",
+      "option": "-Separation",
+      "type": "float",
+      "default": 0.78,
+      "minimum": 0.1,
+      "maximum": 4.0,
+      "step": 0.01,
+      "help": "Initial coordinate separation of the punctures."
+    },
+    {
+      "key": "steps",
+      "label": "Evolution steps",
+      "option": "-Steps",
+      "type": "integer",
+      "default": 500,
+      "minimum": 1,
+      "maximum": 10000,
+      "step": 1,
+      "help": "Production horizon is 500 steps."
+    },
+    {
+      "key": "cfl",
+      "label": "CFL number",
+      "option": "-CFL",
+      "type": "float",
+      "default": 0.04,
+      "minimum": 0.005,
+      "maximum": 0.2,
+      "step": 0.005,
+      "help": "Production stability control is 0.04."
+    },
+    {
+      "key": "observation_cadence",
+      "label": "Observation cadence",
+      "option": "-ObservationCadence",
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 1000,
+      "step": 1,
+      "help": "Steps between MOTS observations."
+    },
+    {
+      "key": "checkpoint_cadence",
+      "label": "Checkpoint cadence",
+      "option": "-CheckpointCadence",
+      "type": "integer",
+      "default": 50,
+      "minimum": 1,
+      "maximum": 5000,
+      "step": 1,
+      "help": "Steps between rolling restart writes."
+    },
+    {
+      "key": "maximum_degree",
+      "label": "Common-horizon degree",
+      "option": "-MaximumDegree",
+      "type": "integer",
+      "default": 16,
+      "minimum": 4,
+      "maximum": 32,
+      "step": 1,
+      "help": "Maximum spectral degree for common MOTS branches."
+    },
+    {
+      "key": "individual_maximum_degree",
+      "label": "Individual-horizon degree",
+      "option": "-IndividualMaximumDegree",
+      "type": "integer",
+      "default": 8,
+      "minimum": 4,
+      "maximum": 24,
+      "step": 1,
+      "help": "Maximum spectral degree for individual horizons."
+    },
+    {
+      "key": "plan_only",
+      "label": "Plan only",
+      "option": "-PlanOnly",
+      "type": "boolean",
+      "default": true,
+      "help": "Validate memory and the horizon gate without allocating the GPU."
+    },
+    {
+      "key": "skip_constraints",
+      "label": "Skip constraint diagnostics",
+      "option": "-SkipConstraints",
+      "type": "boolean",
+      "default": false,
+      "help": "Faster, but removes an important numerical audit."
+    },
+    {
+      "key": "skip_individual",
+      "label": "Skip individual horizons",
+      "option": "-SkipIndividual",
+      "type": "boolean",
+      "default": false,
+      "help": "Track only common branches."
+    }
+  ],
+  "qualification_note": "Disable Plan only only when you intend to start a potentially day-long production evolution."
+}

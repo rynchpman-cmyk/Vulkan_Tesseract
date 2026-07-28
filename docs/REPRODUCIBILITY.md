@@ -20,13 +20,31 @@ python -m venv .venv-slang
 The GPU campaigns require Windows, a current Vulkan driver, and a
 Vulkan-capable device. The CPU tests are platform-independent.
 
+## Beginner-facing launcher
+
+After creating `.venv-slang`, the same qualified campaigns can be launched
+and monitored through Tesseract Studio:
+
+```powershell
+.\run_tesseract_studio.ps1
+```
+
+For a controller-only rehearsal that does not dispatch Vulkan work:
+
+```powershell
+.\run_tesseract_studio.ps1 -Demo
+```
+
+See [Tesseract Studio](TESSERACT_STUDIO.md) for its preset and safety
+contracts.
+
 ## CPU-safe checks
 
 Compile source and validate documentation/artifacts:
 
 ```powershell
 python -m compileall -q .
-python -m unittest tests.test_artifacts -v
+python -m unittest tests.test_artifacts tests.test_studio -v
 ```
 
 Run the numerical-relativity oracle and tracked Vulkan evidence contracts:

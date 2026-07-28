@@ -12,6 +12,8 @@
    release checklist.
 5. [Vulkan puncture/MOTS campaign](VULKAN_PUNCTURE_MOTS.md) — resident vacuum
    CCZ4 evolution and restartable constrained horizon observations.
+6. [Tesseract Studio](TESSERACT_STUDIO.md) — beginner-facing presets,
+   local visual control room, safe stop/resume, and extension contract.
 
 ## Vulkan progression reports
 
