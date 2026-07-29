@@ -376,6 +376,67 @@
       </div>
     </section>
 
+    <section id="observatory" class="observatory-section">
+      <div class="section-heading compact">
+        <div>
+          <span class="section-index">OBS</span>
+          <div>
+            <p>TESSERACT SPACETIME OBSERVATORY</p>
+            <h2>Enter the numerical spacetime.</h2>
+          </div>
+        </div>
+        <span id="observatoryStatus" class="observatory-status">DISCOVERING SCENES</span>
+      </div>
+      <div class="observatory-shell">
+        <div class="observatory-viewport">
+          <canvas id="observatoryCanvas" aria-label="Interactive numerical-relativity volume"></canvas>
+          <div class="observatory-hud">
+            <span id="observatoryFieldLabel">NO FIELD</span>
+            <strong id="observatoryClock">t = —</strong>
+          </div>
+          <div id="observatoryEmpty" class="observatory-empty">
+            <strong>NO REPLAYABLE SCENE FOUND</strong>
+            <span>Export a puncture checkpoint with export_tessviz.py.</span>
+          </div>
+        </div>
+        <aside class="observatory-controls">
+          <label>
+            <span>SCENE</span>
+            <select id="observatoryScene"></select>
+          </label>
+          <label>
+            <span>FIELD</span>
+            <select id="observatoryField"></select>
+          </label>
+          <label>
+            <span>VOLUME DENSITY</span>
+            <input id="observatoryDensity" type="range" min="0.2" max="6" step="0.05" value="1.8">
+          </label>
+          <label>
+            <span>TIME / WORLDTUBE SAMPLE</span>
+            <input id="observatoryTime" type="range" min="0" max="0" step="1" value="0">
+          </label>
+          <div class="observatory-actions">
+            <button id="observatoryReset" class="secondary-button" type="button">Reset camera</button>
+            <button id="observatoryEvidence" class="secondary-button" type="button">Evidence</button>
+          </div>
+          <dl class="observatory-readout">
+            <div><dt>Fine bricks</dt><dd id="observatoryResidency">—</dd></div>
+            <div><dt>Coordinates</dt><dd id="observatoryCoordinates">—</dd></div>
+            <div><dt>Probe plane</dt><dd id="observatoryProbe">Click the volume</dd></div>
+            <div><dt>Precision</dt><dd id="observatoryPrecision">—</dd></div>
+          </dl>
+          <div class="observatory-warning">
+            <span>VISUAL TRUTH CONTRACT</span>
+            <p id="observatoryWarning">
+              Coordinate geometry is gauge and slicing dependent. Values are
+              linked to their field derivation and source checkpoint.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     <section class="system-section">
       <div class="section-heading compact">
         <div>
@@ -451,6 +512,7 @@
   </dialog>
 
   <div id="toast" class="toast" role="status"></div>
+  <script src="/static/observatory.js"></script>
   <script src="/static/studio.js"></script>
 </body>
 </html>

@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rynchpman-cmyk/Vulkan_Tesseract/schemas/tesseract.scene.v1.schema.json",
+  "title": "Tesseract Observatory Scene v1",
+  "description": "Scientific metadata for derived, replayable numerical-relativity visualization scenes. A scene is not a restart checkpoint.",
+  "type": "object",
+  "required": [
+    "schema",
+    "format_version",
+    "scene_id",
+    "title",
+    "coordinates",
+    "frames",
+    "provenance"
+  ],
+  "properties": {
+    "schema": {"const": "tesseract.scene.v1"},
+    "format_version": {"const": 1},
+    "scene_id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "coordinates": {
+      "type": "object",
+      "required": ["chart", "handedness", "axis_order", "axes", "gauge"],
+      "properties": {
+        "chart": {"type": "string"},
+        "handedness": {"enum": ["right", "left"]},
+        "axis_order": {
+          "prefixItems": [
+            {"const": "x"},
+            {"const": "y"},
+            {"const": "z"}
+          ],
+          "items": false
+        },
+        "axes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "type",
+              "unit",
+              "size",
+              "origin",
+              "spacing",
+              "centering"
+            ]
+          }
+        },
+        "gauge": {"type": "object"}
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "step", "time", "fields"],
+        "properties": {
+          "id": {"type": "string"},
+          "step": {"type": "integer", "minimum": 0},
+          "time": {"type": "number"},
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/$defs/field"}
+          }
+        }
+      }
+    },
+    "geometry": {"type": "array"},
+    "worldtubes": {"type": "array"},
+    "evidence": {"type": "object"},
+    "provenance": {
+      "type": "object",
+      "required": [
+        "producer",
+        "source_checkpoint",
+        "source_checkpoint_sha256",
+        "derived_product",
+        "restart_capable"
+      ]
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "symbol",
+        "tensor_type",
+        "centering",
+        "data_type",
+        "storage",
+        "multiscales",
+        "derivation",
+        "accuracy"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "tensor_type": {
+          "enum": [
+            "scalar",
+            "vector",
+            "covector",
+            "symmetric_tensor",
+            "tensor"
+          ]
+        },
+        "centering": {"enum": ["cell", "node", "face", "edge"]},
+        "data_type": {"enum": ["float16", "float32", "float64"]},
+        "multiscales": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "level",
+              "path",
+              "shape",
+              "chunk_shape",
+              "chunk_counts",
+              "scale",
+              "minimum",
+              "maximum"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

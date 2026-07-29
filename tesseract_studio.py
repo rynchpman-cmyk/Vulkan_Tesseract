@@ -41,6 +41,7 @@ STATIC_ROOT = ROOT / "studio" / "static"
 PRESET_ROOT = ROOT / "studio" / "presets"
 PROTOCOL_ROOT = ROOT / "studio" / "protocols"
 RUN_ROOT = ROOT / "runs" / "studio"
+SCENE_ROOT = ROOT / "runs"
 PRESET_SCHEMA = "vulkan-tesseract.studio-preset.v1"
 PROTOCOL_SCHEMA = "vulkan-tesseract.lab-protocol.v1"
 STATE_SCHEMA = "vulkan-tesseract.studio-job.v1"
@@ -76,6 +77,61 @@ def _safe_child(path: Path, parent: Path) -> Path:
     resolved = path.resolve()
     resolved.relative_to(parent.resolve())
     return resolved
+
+
+def scene_catalog() -> list[dict[str, Any]]:
+    """Index validated Observatory packages without exposing host paths."""
+
+    from tesseract_nr.scene import load_scene
+
+    catalog: list[dict[str, Any]] = []
+    if not SCENE_ROOT.is_dir():
+        return catalog
+    for scene_path in sorted(SCENE_ROOT.rglob("*.tessviz")):
+        manifest_path = scene_path / "scene.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = load_scene(manifest_path)
+            relative = scene_path.relative_to(SCENE_ROOT).as_posix()
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        identifier = hashlib.sha256(relative.encode("utf-8")).hexdigest()[:20]
+        frames = manifest.get("frames", [])
+        catalog.append(
+            {
+                "id": identifier,
+                "scene_id": manifest["scene_id"],
+                "title": manifest["title"],
+                "description": manifest.get("description", ""),
+                "relative_path": relative,
+                "frame_count": len(frames),
+                "field_count": sum(
+                    len(frame.get("fields", []))
+                    for frame in frames
+                    if isinstance(frame, dict)
+                ),
+                "geometry_count": len(manifest.get("geometry", [])),
+                "latest_step": max(
+                    (
+                        int(frame.get("step", 0))
+                        for frame in frames
+                        if isinstance(frame, dict)
+                    ),
+                    default=0,
+                ),
+            }
+        )
+    return catalog
+
+
+def resolve_scene(identifier: str) -> Path:
+    for item in scene_catalog():
+        if item["id"] == identifier:
+            return _safe_child(
+                SCENE_ROOT / str(item["relative_path"]), SCENE_ROOT
+            )
+    raise KeyError(f"unknown scene {identifier!r}")
 
 
 @dataclass(frozen=True)
@@ -1742,6 +1798,8 @@ class StudioHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         self.end_headers()
         self.wfile.write(body)
 
@@ -1763,6 +1821,9 @@ class StudioHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         self.send_header(
             "Cache-Control",
             "no-cache" if path.suffix == ".html" else "public, max-age=300",
@@ -1793,6 +1854,39 @@ class StudioHandler(BaseHTTPRequestHandler):
                     "results": self.server.manager.result_catalog(),
                 }
             )
+            return
+        if path == "/api/scenes":
+            self._json({"ok": True, "scenes": scene_catalog()})
+            return
+        scene_match = re.fullmatch(
+            r"/api/scenes/([a-f0-9]{20})/manifest", path
+        )
+        if scene_match:
+            try:
+                scene = resolve_scene(scene_match.group(1))
+                payload = json.loads(
+                    (scene / "scene.json").read_text(encoding="utf-8")
+                )
+            except KeyError as exc:
+                self._error(str(exc), HTTPStatus.NOT_FOUND)
+                return
+            except (OSError, json.JSONDecodeError) as exc:
+                self._error(str(exc), HTTPStatus.UNPROCESSABLE_ENTITY)
+                return
+            self._json({"ok": True, "scene": payload})
+            return
+        scene_file_match = re.fullmatch(
+            r"/api/scenes/([a-f0-9]{20})/files/(.+)", path
+        )
+        if scene_file_match:
+            try:
+                scene = resolve_scene(scene_file_match.group(1))
+                relative = scene_file_match.group(2)
+                target = _safe_child(scene / relative, scene)
+            except (KeyError, ValueError):
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self._file(target)
             return
         if path.startswith("/api/results/"):
             identifier = path.removeprefix("/api/results/")

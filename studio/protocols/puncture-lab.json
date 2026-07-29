@@ -8,7 +8,9 @@
   "accent": "#fb7185",
   "estimated_seconds": 86400,
   "minimum_vram_gib": 3,
-  "fixed_arguments": [],
+  "fixed_arguments": [
+    "-Observatory"
+  ],
   "output": {
     "option": "-OutputDirectory",
     "name": "puncture"
@@ -91,6 +93,28 @@
       "maximum": 5000,
       "step": 1,
       "help": "Steps between rolling restart writes."
+    },
+    {
+      "key": "visualization_cadence",
+      "label": "3D frame cadence",
+      "option": "-VisualizationCadence",
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 1000,
+      "step": 1,
+      "help": "Steps between compact GPU-derived Observatory frames."
+    },
+    {
+      "key": "visualization_maximum_axis",
+      "label": "3D maximum axis",
+      "option": "-VisualizationMaximumAxis",
+      "type": "integer",
+      "default": 64,
+      "minimum": 16,
+      "maximum": 120,
+      "step": 8,
+      "help": "Caps each visualization axis without changing solver resolution."
     },
     {
       "key": "maximum_degree",

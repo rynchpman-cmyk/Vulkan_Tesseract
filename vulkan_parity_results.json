@@ -312,7 +312,7 @@
   "implementation_sha256": {
     "run_vulkan_original_workflows.py": "305dc636cd5a05690a04fc615e8b875caf7fef48278b5c0227a133a6249005bf",
     "run_vulkan_parity.py": "8919b3072c5ef275e2e3d8dd122be025ddb326e4149caccb644f44fc9633b6ff",
-    "run_vulkan_puncture_mots.py": "4522fbb21d3849f6c5b3b66e05e11b27b3305fcae52470d31cd8fa7b8cad5b99",
+    "run_vulkan_puncture_mots.py": "a0826f26cbf5a76c6adbba79c4ed2a2cd99748204b2690782c951be8386779ed",
     "tesseract_cmc_fp64.slang": "0f49a90752249431b68e69e6c6f7d89379b7fa8ff8d307221540c9edfad46396",
     "tesseract_ctt_fp64.slang": "dc405c7a5f5ce3437e9facfbd2235c2e7172ddff443ed6f2f723d65d2a7153a9",
     "tesseract_nr/vulkan_amr.py": "3bd863d3ddac080e5a8cc108332b1ec3e60588d0891891ef25ea31d31ae6eb71",
@@ -325,7 +325,7 @@
     "tesseract_nr/vulkan_parity.py": "ab8c77dfd526b20ac1e8ac7dff969ed317ed55017ab49fa0dbea14adcf022320",
     "tesseract_nr/vulkan_tov.py": "a44ababa9b5e6662bc8bba31e03aeee7b5bf2431b86a5e32cb60bd9396291002",
     "tesseract_nr/vulkan_validation.py": "3c15d0c88eb2942f06a0903d050822e0509aeab4573d26854252065e301cc971",
-    "tesseract_nr_gpu.slang": "7c9e08539c7b2e9667858fd38051d27f07896176a2bf98a5ff496cb8f11b1bbf",
+    "tesseract_nr_gpu.slang": "6ce532b7b474919ad990167886501248b86c431c271afde68eac05796205083f",
     "tesseract_tov_fp64.slang": "cdb7028520112391727ff46dbaf5f75a22a7f3d9f92c1eb9f7bba4223413fc09",
     "theory33_frozen_variants.json": "8ab3e8359686441402d3454fe3949af3642399d8a9e38145fed29299b01cf8a9",
     "theory33_qualified_frozen.slang": "10c3cf40409107790640984e8fd397286f112f570253f7c063f63612a98397e1"

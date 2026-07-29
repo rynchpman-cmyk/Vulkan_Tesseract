@@ -15,7 +15,10 @@ param(
     [switch]$PlanOnly,
     [switch]$SkipConstraints,
     [switch]$SkipIndividual,
-    [switch]$SaveSnapshots
+    [switch]$SaveSnapshots,
+    [switch]$Observatory,
+    [int]$VisualizationCadence = 10,
+    [int]$VisualizationMaximumAxis = 64
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +43,8 @@ $Arguments = @(
     "--cfl", $CFL,
     "--observation-cadence", $ObservationCadence,
     "--checkpoint-cadence", $CheckpointCadence,
+    "--visualization-cadence", $VisualizationCadence,
+    "--visualization-maximum-axis", $VisualizationMaximumAxis,
     "--maximum-degree", $MaximumDegree,
     "--individual-maximum-degree", $IndividualMaximumDegree,
     "--maximum-iterations", $MaximumIterations,
@@ -66,6 +71,9 @@ if ($SkipIndividual) {
 }
 if ($SaveSnapshots) {
     $Arguments += "--save-snapshots"
+}
+if ($Observatory) {
+    $Arguments += "--observatory"
 }
 
 & $Python @Arguments

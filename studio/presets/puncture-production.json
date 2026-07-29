@@ -21,6 +21,11 @@
     "10",
     "-CheckpointCadence",
     "50",
+    "-Observatory",
+    "-VisualizationCadence",
+    "10",
+    "-VisualizationMaximumAxis",
+    "64",
     "-MaximumDegree",
     "16",
     "-IndividualMaximumDegree",
@@ -35,7 +40,7 @@
   "duration_label": "About 20–30 hours",
   "estimated_seconds": 86400,
   "minimum_vram_gib": 3,
-  "disk_label": "About 200 MB rolling",
+  "disk_label": "About 700 MB with replayable 3D observations",
   "tier": "long",
   "visualizer": "puncture",
   "accent": "#fb7185",
@@ -44,6 +49,7 @@
   "result_files": [
     "runs/vulkan_ccz4_puncture_mots_n120/trajectory.json",
     "runs/vulkan_ccz4_puncture_mots_n120/summary.json",
-    "runs/vulkan_ccz4_puncture_mots_n120/final_checkpoint.npz"
+    "runs/vulkan_ccz4_puncture_mots_n120/final_checkpoint.npz",
+    "runs/vulkan_ccz4_puncture_mots_n120/observatory/live.tessviz/scene.json"
   ]
 }

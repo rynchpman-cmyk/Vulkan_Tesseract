@@ -56,6 +56,28 @@ archives.
 See the [Tesseract Studio guide](docs/TESSERACT_STUDIO.md) for the preset
 catalog, safety boundary, and developer contract.
 
+### Tesseract Spacetime Observatory
+
+Studio now includes a ground-up WebGPU volume renderer backed by an explicit
+scientific visualization data plane. It discovers `.tessviz` scenes, streams
+multiresolution Zarr v3 field bricks into coarse/fine GPU textures, maintains
+a residency page table, ray marches scalar volumes, overlays MOTS and learned
+phase geometry, probes float32 field values, and keeps the source evidence and
+coordinate/gauge warning visible.
+
+Export the existing compact puncture checkpoint:
+
+```powershell
+.\.venv-slang\Scripts\python.exe .\export_tessviz.py `
+  .\runs\vulkan_ccz4_puncture_mots_smoke\final_checkpoint.npz `
+  .\runs\observatory\puncture-smoke.tessviz
+```
+
+The production puncture preset enables compact live GPU observations at an
+independent visualization cadence. These are derived replay frames, not
+restart checkpoints, and backpressure may drop them rather than stall the
+solver. See the complete [Observatory contract and architecture](docs/TESSERACT_OBSERVATORY.md).
+
 ## Current GPU milestone
 
 The resident multidimensional engine advances:
@@ -259,6 +281,9 @@ See [architecture](docs/ARCHITECTURE.md) and
 | `VULKAN_*_REPORT.md` | Scope, measurements, reproduction, and honest boundaries |
 | `tesseract_full_stack_visualizer.py` | Neural-spacetime dashboard renderer |
 | `tesseract_full_stack_dashboard.png` | Repository dashboard image |
+| `export_tessviz.py` | Puncture and full-stack checkpoint scene exporter |
+| `tesseract_nr/scene.py` | `tesseract.scene.v1`, Zarr volumes, meshes and worldtubes |
+| `tesseract_nr/vulkan_observatory.py` | Bounded resident observation and writer staging |
 | `tesseract_studio.py` | Local preset controller, job monitor, and HTTP API |
 | `studio/` | Beginner-facing dashboard assets and declarative preset manifests |
 | `studio/protocols/` | Typed Advanced Mode experiment and parameter contracts |

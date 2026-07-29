@@ -33,6 +33,7 @@ shader = [
 packages = ["tesseract_nr"]
 py-modules = [
     "export_hybrid",
+    "export_tessviz",
     "export_theory33_frozen_slang",
     "fit_theory33_basin",
     "generate_theory33_kinetic_data",

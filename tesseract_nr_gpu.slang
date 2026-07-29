@@ -5650,6 +5650,130 @@ void ccz4VacuumRhsKernel(
     }
 }
 
+// Compact in-situ visualization output.  This kernel deliberately derives
+// observables from the resident CCZ4 state instead of copying the 31-component
+// restart ABI.  Columns are:
+// alpha, chi, K, Theta, |beta|, Hamiltonian, |Z|, conformal det residual.
+void tesseractObserveCCZ4Kernel(
+    int point,
+    int nx,
+    int ny,
+    int nz,
+    int observationNx,
+    int observationNy,
+    int observationNz,
+    float inverseDx,
+    float inverseDy,
+    float inverseDz,
+    int derivativeOrder,
+    float cosmologicalConstant,
+    ITensor<float, 2> state,
+    IWTensor<float, 2> observation
+)
+{
+    int observationX = point % observationNx;
+    int observationY = (point / observationNx) % observationNy;
+    int observationZ = point / (observationNx * observationNy);
+    int sourceX = min(
+        int((float(observationX) + 0.5) * float(nx) / float(observationNx)),
+        nx - 1
+    );
+    int sourceY = min(
+        int((float(observationY) + 0.5) * float(ny) / float(observationNy)),
+        ny - 1
+    );
+    int sourceZ = min(
+        int((float(observationZ) + 0.5) * float(nz) / float(observationNz)),
+        nz - 1
+    );
+    int sourcePoint = sourceX + nx * (sourceY + ny * sourceZ);
+    float gt[9] = {};
+    float gtInverse[9] = {};
+    float gtConnection[27] = {};
+    vtCCZ4Connection(
+        sourcePoint, false, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz, derivativeOrder, state,
+        gt, gtInverse, gtConnection
+    );
+    float h[9] = {};
+    float hInverse[9] = {};
+    float hConnection[27] = {};
+    vtCCZ4Connection(
+        sourcePoint, true, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz, derivativeOrder, state,
+        h, hInverse, hConnection
+    );
+    float ricci[9] = {};
+    vtCCZ4Ricci(
+        sourcePoint, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz,
+        derivativeOrder, state, ricci
+    );
+    float scalarRicci = 0.0;
+    for (int row = 0; row < 3; ++row)
+    {
+        for (int column = 0; column < 3; ++column)
+            scalarRicci +=
+                hInverse[row * 3 + column] * ricci[row * 3 + column];
+    }
+    float aSquared = 0.0;
+    for (int first = 0; first < 3; ++first)
+    {
+        for (int second = 0; second < 3; ++second)
+        {
+            float raised = 0.0;
+            for (int inner = 0; inner < 3; ++inner)
+            {
+                for (int other = 0; other < 3; ++other)
+                {
+                    raised +=
+                        gtInverse[first * 3 + inner]
+                        * gtInverse[second * 3 + other]
+                        * state[sourcePoint, 9 + inner * 3 + other];
+                }
+            }
+            aSquared += state[sourcePoint, 9 + first * 3 + second] * raised;
+        }
+    }
+    float zDown[3] = {};
+    vtCCZ4ZCovector(
+        sourcePoint, nx, ny, nz,
+        inverseDx, inverseDy, inverseDz,
+        derivativeOrder, state, zDown
+    );
+    float zSquared = 0.0;
+    for (int first = 0; first < 3; ++first)
+    {
+        for (int second = 0; second < 3; ++second)
+            zSquared +=
+                hInverse[first * 3 + second]
+                * zDown[first]
+                * zDown[second];
+    }
+    float shiftSquared = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+        shiftSquared +=
+            state[sourcePoint, 25 + axis]
+            * state[sourcePoint, 25 + axis];
+    float determinant =
+        gt[0] * (gt[4] * gt[8] - gt[5] * gt[7])
+        - gt[1] * (gt[3] * gt[8] - gt[5] * gt[6])
+        + gt[2] * (gt[3] * gt[7] - gt[4] * gt[6]);
+    float traceK = state[sourcePoint, 19];
+    observation[point, 0] = state[sourcePoint, 24];
+    observation[point, 1] = state[sourcePoint, 18];
+    observation[point, 2] = traceK;
+    observation[point, 3] = state[sourcePoint, 20];
+    observation[point, 4] = sqrt(max(shiftSquared, 0.0));
+    observation[point, 5] =
+        scalarRicci
+        - aSquared
+        + (2.0 / 3.0) * traceK * traceK
+        - 2.0 * cosmologicalConstant;
+    observation[point, 6] = sqrt(max(zSquared, 0.0));
+    observation[point, 7] = abs(determinant - 1.0);
+}
+
 void theory33FullComposeCurvedKernel(
     int point,
     int modelMode,

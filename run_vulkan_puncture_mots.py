@@ -82,6 +82,13 @@ def main() -> None:
     parser.add_argument("--skip-individual", action="store_true")
     parser.add_argument("--skip-constraints", action="store_true")
     parser.add_argument("--save-snapshots", action="store_true")
+    parser.add_argument(
+        "--observatory",
+        action="store_true",
+        help="stream compact GPU-derived fields into a live .tessviz scene",
+    )
+    parser.add_argument("--visualization-cadence", type=int, default=10)
+    parser.add_argument("--visualization-maximum-axis", type=int, default=64)
     parser.add_argument("--restart-from", type=Path)
     parser.add_argument(
         "--observer-restart",
@@ -108,6 +115,10 @@ def main() -> None:
         parser.error("steps and CFL are invalid")
     if args.observation_cadence < 1 or args.checkpoint_cadence < 1:
         parser.error("cadences must be positive")
+    if args.visualization_cadence < 1:
+        parser.error("visualization cadence must be positive")
+    if args.visualization_maximum_axis < 8:
+        parser.error("visualization maximum axis must be at least eight")
 
     layout = VulkanCCZ4Layout(
         (args.resolution,) * 3,
@@ -219,6 +230,38 @@ def main() -> None:
                 trajectory_path.read_text(encoding="utf-8")
             )
 
+    observation_ring = None
+    scene_writer = None
+    scene_sink = None
+    if args.observatory:
+        from tesseract_nr.scene import LiveSceneWriter
+        from tesseract_nr.vulkan_observatory import (
+            AsyncLiveSceneSink,
+            VulkanCCZ4ObservationRing,
+        )
+
+        observation_ring = VulkanCCZ4ObservationRing(
+            backend, maximum_axis=args.visualization_maximum_axis
+        )
+        scene_writer = LiveSceneWriter(
+            output / "observatory" / "live.tessviz",
+            shape=observation_ring.shape,
+            lengths=observation_ring.lengths,
+            origins=observation_ring.origins,
+            derivative_order=observation_ring.derivative_order,
+        )
+        scene_sink = AsyncLiveSceneSink(scene_writer)
+
+    def pump_observatory(*, capture: bool = False) -> None:
+        if observation_ring is None or scene_sink is None:
+            return
+        frame = observation_ring.poll()
+        if frame is not None:
+            scene_sink.submit(frame)
+        scene_sink.poll()
+        if capture:
+            observation_ring.capture(state)
+
     def observe() -> None:
         snapshot = backend.snapshot(state)
         record = observer.observe_snapshot(snapshot)
@@ -295,12 +338,29 @@ def main() -> None:
 
     if not records or int(records[-1]["step"]) < starting_step:
         observe()
+    pump_observatory(capture=True)
     for step in range(starting_step + 1, args.steps + 1):
         backend.step(state, dt)
+        pump_observatory(
+            capture=(
+                step % args.visualization_cadence == 0
+                or step == args.steps
+            )
+        )
         if step % args.observation_cadence == 0 or step == args.steps:
             observe()
         if step % args.checkpoint_cadence == 0 or step == args.steps:
             checkpoint()
+
+    if observation_ring is not None and scene_sink is not None:
+        final_frame = observation_ring.wait()
+        if final_frame is not None:
+            scene_sink.wait()
+            scene_sink.submit(final_frame)
+        scene_sink.close()
+        observation_ring.close()
+        assert scene_writer is not None
+        scene_writer.sync_trajectory(trajectory_path)
 
     summary = {
         "format": "vulkan-tesseract.puncture-mots-summary.v1",
@@ -309,6 +369,20 @@ def main() -> None:
         "final_time": state.time,
         "records": len(records),
         "host_reads": state.host_reads,
+        "visualization": {
+            "enabled": args.observatory,
+            "cadence": args.visualization_cadence,
+            "maximum_axis": args.visualization_maximum_axis,
+            "derived_restart_capable": False,
+        },
+        "observatory_frames": (
+            0 if scene_sink is None else scene_sink.written
+        ),
+        "observatory_dropped": (
+            0
+            if observation_ring is None or scene_sink is None
+            else observation_ring.dropped + scene_sink.dropped
+        ),
         "qualified_sign_observations": sum(
             int(
                 value is not None
