@@ -526,8 +526,15 @@ class VulkanReferenceContractTests(unittest.TestCase):
         )
         self.assertTrue(report["qualified"])
         self.assertTrue(all(report["qualification"].values()))
-        self.assertTrue(
-            report["reference_source_audit"]["identical"]
+        from tesseract_nr.vulkan_parity import EXPECTED_REFERENCE_DIVERGENCES
+
+        reference = report["reference_source_audit"]
+        self.assertTrue(reference["checked"])
+        self.assertFalse(reference["missing_files"])
+        self.assertFalse(reference["unexpected_content_mismatches"])
+        self.assertEqual(
+            reference["expected_divergences"],
+            {name: EXPECTED_REFERENCE_DIVERGENCES[name] for name in reference["content_mismatches"]},
         )
         self.assertTrue(
             all(row["qualified"] for row in report["capabilities"])

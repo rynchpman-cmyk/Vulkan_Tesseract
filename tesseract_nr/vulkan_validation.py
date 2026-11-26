@@ -79,6 +79,7 @@ def reference_full_principal(
     *,
     axis: int,
     phase_override: bool | None = None,
+    full_path: bool = False,
 ) -> tuple[Array, Array, Array]:
     """CPU float64 curved-space nine-field U/F/path evaluation."""
     x = np.asarray(primitive, dtype=float)
@@ -100,11 +101,10 @@ def reference_full_principal(
     q_d = x[6:9]
     w_d = float(np.sqrt(1.0 + q_d @ h @ q_d))
     velocity_d = q_d / w_d
-    transport_d = lapse * velocity_d[axis] - shift[axis]
-    path = np.asarray(
-        (fields[2], fields[3], fields[4], transport_d),
-        dtype=float,
-    )
+    transport_d = lapse * velocity_d - shift
+    path = np.r_[fields[2], fields[3], fields[4], transport_d]
+    if not full_path:
+        path = path[[0, 1 + axis, 4, 5 + axis]]
     return (
         np.asarray(fields[0], dtype=float),
         np.asarray(fields[1], dtype=float),
@@ -135,6 +135,7 @@ def reference_full_carter_symbol(
         geometric,
         axis=axis,
         phase_override=phase,
+        full_path=True,
     )
     time_jacobian = np.empty((9, 9))
     flux_path_jacobian = np.empty((9, 9))
@@ -150,6 +151,7 @@ def reference_full_carter_symbol(
             geometric,
             axis=axis,
             phase_override=phase,
+            full_path=True,
         )
         minus_u, minus_flux, minus_path = reference_full_principal(
             solver,
@@ -157,6 +159,7 @@ def reference_full_carter_symbol(
             geometric,
             axis=axis,
             phase_override=phase,
+            full_path=True,
         )
         time_jacobian[:, column] = (
             plus_u - minus_u
@@ -167,12 +170,11 @@ def reference_full_carter_symbol(
         chi_zero_derivative = (
             plus_path[0] - minus_path[0]
         ) / (2.0 * step)
-        chi_axis_derivative = (
-            plus_path[1] - minus_path[1]
+        chi_spatial_derivative = (
+            plus_path[1:4] - minus_path[1:4]
         ) / (2.0 * step)
-        flux_path_jacobian[6 + axis, column] -= base_path[2] * (
-            chi_zero_derivative
-            + base_path[3] * chi_axis_derivative
+        flux_path_jacobian[6 + axis, column] -= base_path[4] * (
+            chi_zero_derivative + base_path[5:8] @ chi_spatial_derivative
         )
     symbol = flux_path_jacobian @ np.linalg.inv(time_jacobian)
     eigenvalues = np.linalg.eigvals(symbol)

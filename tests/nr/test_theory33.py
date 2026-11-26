@@ -251,6 +251,28 @@ class Theory33ProductionTests(unittest.TestCase):
         self.assertAlmostEqual(grid.integrate(rhs[11]), 0.0, places=13)
         self.assertAlmostEqual(grid.integrate(rhs[22]), 0.0, places=13)
 
+    def test_carrier_momentum_rhs_retains_transverse_velocity_on_reduced_grids(self):
+        for active_axes in (1, 2):
+            with self.subTest(active_axes=active_axes):
+                momentum_rhs = []
+                for dimensions in (active_axes, active_axes + 1):
+                    shape = (8,) + (4,) * (dimensions - 1)
+                    grid = PeriodicGrid(shape, (2.0,) * dimensions, method="fd2")
+                    solver = Theory33ProductionSolver(grid)
+                    x = grid.coordinates()[0]
+                    fluid = FluidPrimitive(
+                        np.full(shape, 0.6), np.full(shape, 0.2),
+                        grid.zeros((3,)), grid.zeros(),
+                    )
+                    velocity = grid.zeros((3,))
+                    velocity[active_axes] = 0.12 + 0.04 * np.sin(np.pi * x)
+                    carrier = CarrierPrimitive(np.full(shape, 0.05), velocity)
+                    state = solver.initialize(solver.ccz4.flat_state(), fluid, carrier=carrier)
+                    momentum_rhs.append(solver.rhs(state.time, solver._pack(state))[-1])
+                np.testing.assert_allclose(
+                    momentum_rhs[0], momentum_rhs[1][..., 0], atol=1e-12, rtol=1e-10,
+                )
+
     def test_nonuniform_coupled_step_remains_admissible(self):
         grid, solver = self._solver(points=12)
         fluid, carrier = self._fluid_and_carrier(grid)

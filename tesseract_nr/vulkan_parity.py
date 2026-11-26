@@ -9,6 +9,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+EXPECTED_REFERENCE_DIVERGENCES = {
+    "tesseract_nr/production33.py": (
+        "The full carrier momentum contraction includes transverse velocity "
+        "components on reduced grids."
+    ),
+}
+
 IMPLEMENTATION_PATHS = (
     "run_vulkan_original_workflows.py",
     "run_vulkan_parity.py",
@@ -19,6 +26,7 @@ IMPLEMENTATION_PATHS = (
     "tesseract_tov_fp64.slang",
     "theory33_qualified_frozen.slang",
     "theory33_frozen_variants.json",
+    "tesseract_nr/production33.py",
     "tesseract_nr/vulkan_backend.py",
     "tesseract_nr/vulkan_ccz4_vacuum.py",
     "tesseract_nr/vulkan_mots.py",
@@ -294,6 +302,9 @@ def audit_vulkan_capability_parity(
         "files_compared": 0,
         "missing_files": [],
         "content_mismatches": [],
+        "line_ending_only_differences": [],
+        "expected_divergences": {},
+        "unexpected_content_mismatches": [],
         "identical": None,
     }
     if reference_root is not None:
@@ -301,21 +312,36 @@ def audit_vulkan_capability_parity(
         if reference.is_dir():
             missing = []
             mismatches = []
+            line_endings = []
             reference_files = _reference_files(reference)
             for source in reference_files:
                 relative = source.relative_to(reference)
                 target = project / relative
                 if not target.is_file():
                     missing.append(relative.as_posix())
-                elif _digest(source) != _digest(target):
+                    continue
+                source_bytes, target_bytes = source.read_bytes(), target.read_bytes()
+                if source_bytes == target_bytes:
+                    continue
+                if source_bytes.replace(b"\r\n", b"\n") == target_bytes.replace(b"\r\n", b"\n"):
+                    line_endings.append(relative.as_posix())
+                else:
                     mismatches.append(relative.as_posix())
+            expected = {
+                name: EXPECTED_REFERENCE_DIVERGENCES[name]
+                for name in mismatches if name in EXPECTED_REFERENCE_DIVERGENCES
+            }
+            unexpected = [name for name in mismatches if name not in expected]
             reference_report = {
                 "checked": True,
                 "reference_root": str(reference),
                 "files_compared": len(reference_files),
                 "missing_files": missing,
                 "content_mismatches": mismatches,
-                "identical": not missing and not mismatches,
+                "line_ending_only_differences": line_endings,
+                "expected_divergences": expected,
+                "unexpected_content_mismatches": unexpected,
+                "identical": not missing and not mismatches and not line_endings,
             }
 
     qualification = {
@@ -334,8 +360,9 @@ def audit_vulkan_capability_parity(
         ),
     }
     if reference_report["checked"]:
-        qualification["computational_source_copy_matches_reference"] = bool(
-            reference_report["identical"]
+        qualification["reference_sources_have_no_unexpected_differences"] = (
+            not reference_report["missing_files"]
+            and not reference_report["unexpected_content_mismatches"]
         )
     implementation_digests = {
         value: _digest(project / value)

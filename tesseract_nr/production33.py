@@ -891,7 +891,7 @@ class Theory33ProductionSolver(Theory3ProductionSolver):
         """Evaluate the literal nine-field Carter principal subsystem.
 
         The conserved order is ``(D_N,D_D,S_i,E,P_i^D)``.  The returned path
-        coefficient multiplies derivatives of ``chi_0`` and ``chi_axis`` in
+        coefficient multiplies derivatives of ``chi_0`` and all spatial ``chi_i`` in
         the canonical-momentum equation.  Hard constitutive decisions are
         supplied by the caller and remain fixed during numerical
         differentiation.
@@ -1040,7 +1040,7 @@ class Theory33ProductionSolver(Theory3ProductionSolver):
             conserved,
             flux,
             chi_zero,
-            chi_down[axis],
+            chi_down,
             sqrt_h * dW,
         )
 
@@ -1072,7 +1072,7 @@ class Theory33ProductionSolver(Theory3ProductionSolver):
         time_jacobian = np.empty((9, 9) + self.grid.shape)
         flux_jacobian = np.empty_like(time_jacobian)
         chi_zero_jacobian = np.empty((9,) + self.grid.shape)
-        chi_axis_jacobian = np.empty_like(chi_zero_jacobian)
+        chi_spatial_jacobian = np.empty((3, 9) + self.grid.shape)
         for column in range(9):
             step = 2.0e-6 * np.maximum(
                 1.0, np.abs(primitive[column])
@@ -1097,16 +1097,14 @@ class Theory33ProductionSolver(Theory3ProductionSolver):
             chi_zero_jacobian[column] = (
                 plus_fields[2] - minus_fields[2]
             ) / denominator
-            chi_axis_jacobian[column] = (
+            chi_spatial_jacobian[:, column] = (
                 plus_fields[3] - minus_fields[3]
-            ) / denominator
-        transport_D = (
-            lapse * recovery.carrier.velocity[axis] - shift[axis]
-        )
+            ) / denominator[None, ...]
+        transport_D = lapse[None, ...] * recovery.carrier.velocity - shift
         path_primitive = np.zeros_like(time_jacobian)
         path_primitive[6 + axis] = -base[4][None, ...] * (
             chi_zero_jacobian
-            + transport_D[None, ...] * chi_axis_jacobian
+            + np.einsum("i...,ij...->j...", transport_D, chi_spatial_jacobian)
         )
         time_batch = np.moveaxis(
             time_jacobian, (0, 1), (-2, -1)
@@ -1742,9 +1740,10 @@ class Theory33ProductionSolver(Theory3ProductionSolver):
             source = self._path_product(
                 carrier_density_eulerian, chi_zero, component
             )
-            for axis in range(self.grid.ndim):
+            # Only the derivative direction is limited to the active grid axes.
+            for axis, transport_component in enumerate(transport_D):
                 source += self._path_product(
-                    carrier_density_eulerian * transport_D[axis],
+                    carrier_density_eulerian * transport_component,
                     chi_down[axis],
                     component,
                 )

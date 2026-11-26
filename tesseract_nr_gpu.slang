@@ -2183,9 +2183,9 @@ struct VTPrincipal9
     float conserved[9];
     float flux[9];
     float chiZero;
-    float chiAxis;
+    float chiDown[3];
     float carrierEulerian;
-    float carrierTransported;
+    float carrierTransport[3];
     bool phaseTwo;
     float switchingMargin;
     bool valid;
@@ -2363,10 +2363,13 @@ VTPrincipal9 vtPrincipal9(
         material.bD * dW + material.entrainment * nW;
     result.chiZero = -geometry.lapse * chiNormal;
     for (int component = 0; component < 3; ++component)
+    {
         result.chiZero += geometry.shift[component] * chiDown[component];
-    result.chiAxis = chiDown[axis];
+        result.chiDown[component] = chiDown[component];
+        result.carrierTransport[component] =
+            geometry.lapse * velocityD[component] - geometry.shift[component];
+    }
     result.carrierEulerian = densitizedD;
-    result.carrierTransported = transportD;
     result.phaseTwo = material.phaseTwo;
     result.switchingMargin = material.switchingMargin;
     result.valid =
@@ -2405,9 +2408,9 @@ void theory33FullPrincipalKernel(
         flux[point, index] = principal.flux[index];
     }
     path[point, 0] = principal.chiZero;
-    path[point, 1] = principal.chiAxis;
+    path[point, 1] = principal.chiDown[clamp(axis, 0, 2)];
     path[point, 2] = principal.carrierEulerian;
-    path[point, 3] = principal.carrierTransported;
+    path[point, 3] = principal.carrierTransport[clamp(axis, 0, 2)];
     valid[point] = principal.valid ? 1.0 : 0.0;
 }
 
@@ -2988,15 +2991,15 @@ VTEigensystem9 vtCarterSymbol9(
         float chiZeroDerivative =
             (plusPrincipal.chiZero - minusPrincipal.chiZero)
             * inverseStep;
-        float chiAxisDerivative =
-            (plusPrincipal.chiAxis - minusPrincipal.chiAxis)
-            * inverseStep;
+        float pathDerivative = chiZeroDerivative;
+        for (int component = 0; component < 3; ++component)
+        {
+            pathDerivative += base.carrierTransport[component]
+                * (plusPrincipal.chiDown[component] - minusPrincipal.chiDown[component])
+                * inverseStep;
+        }
         fluxPathJacobian[(6 + axis) * 9 + column] -=
-            base.carrierEulerian
-            * (
-                chiZeroDerivative
-                + base.carrierTransported * chiAxisDerivative
-            );
+            base.carrierEulerian * pathDerivative;
     }
     float inverseTime[81] = {};
     float symbol[81] = {};
@@ -3052,15 +3055,15 @@ void vtCarterPathSymbol9(
         float chiZeroDerivative =
             (plusPrincipal.chiZero - minusPrincipal.chiZero)
             * inverseStep;
-        float chiAxisDerivative =
-            (plusPrincipal.chiAxis - minusPrincipal.chiAxis)
-            * inverseStep;
+        float pathDerivative = chiZeroDerivative;
+        for (int component = 0; component < 3; ++component)
+        {
+            pathDerivative += base.carrierTransport[component]
+                * (plusPrincipal.chiDown[component] - minusPrincipal.chiDown[component])
+                * inverseStep;
+        }
         pathPrimitive[(6 + axis) * 9 + column] =
-            -base.carrierEulerian
-            * (
-                chiZeroDerivative
-                + base.carrierTransported * chiAxisDerivative
-            );
+            -base.carrierEulerian * pathDerivative;
     }
     float inverseTime[81] = {};
     if (!vtInvert9(timeJacobian, inverseTime))
@@ -6168,9 +6171,12 @@ void theory33FullFluxCurvedKernel(
     flux[point, 10] = state[point, 10] * transportN;
     pathData[point, 0] = material.carrierEulerian;
     pathData[point, 1] = material.chiZero;
-    pathData[point, 2] =
-        material.carrierEulerian * material.carrierTransported;
-    pathData[point, 3] = material.chiAxis;
+    for (int component = 0; component < 3; ++component)
+    {
+        pathData[point, 2 + component] =
+            material.carrierEulerian * material.carrierTransport[component];
+        pathData[point, 5 + component] = material.chiDown[component];
+    }
     float coordinateLight =
         abs(geometry.shift[axis])
         + geometry.lapse
@@ -6819,6 +6825,29 @@ void theory33FullRoeDirectionalRhsKernel(
     }
 }
 
+float vtFullCarterPathSource(
+    int point, int previous, int following, ITensor<float, 2> pathData
+)
+{
+    float densityRight = 0.5 * (pathData[point, 0] + pathData[following, 0]);
+    float densityLeft = 0.5 * (pathData[point, 0] + pathData[previous, 0]);
+    float source =
+        densityRight * (pathData[following, 1] - pathData[point, 1])
+        + densityLeft * (pathData[point, 1] - pathData[previous, 1]);
+    for (int component = 0; component < 3; ++component)
+    {
+        int transport = 2 + component;
+        int momentum = 5 + component;
+        float transportedRight =
+            0.5 * (pathData[point, transport] + pathData[following, transport]);
+        float transportedLeft =
+            0.5 * (pathData[point, transport] + pathData[previous, transport]);
+        source += transportedRight * (pathData[following, momentum] - pathData[point, momentum])
+            + transportedLeft * (pathData[point, momentum] - pathData[previous, momentum]);
+    }
+    return source;
+}
+
 void theory33FullDirectionalRhsKernel(
     int point,
     int axis,
@@ -6837,23 +6866,7 @@ void theory33FullDirectionalRhsKernel(
     int following = vtGridNeighbor(
         point, axis, 1, nx, ny, nz
     );
-    float coefficientRight =
-        0.5 * (pathData[point, 0] + pathData[following, 0]);
-    float coefficientLeft =
-        0.5 * (pathData[point, 0] + pathData[previous, 0]);
-    float transportedRight =
-        0.5 * (pathData[point, 2] + pathData[following, 2]);
-    float transportedLeft =
-        0.5 * (pathData[point, 2] + pathData[previous, 2]);
-    float pathSource =
-        coefficientRight
-        * (pathData[following, 1] - pathData[point, 1])
-        + coefficientLeft
-        * (pathData[point, 1] - pathData[previous, 1])
-        + transportedRight
-        * (pathData[following, 3] - pathData[point, 3])
-        + transportedLeft
-        * (pathData[point, 3] - pathData[previous, 3]);
+    float pathSource = vtFullCarterPathSource(point, previous, following, pathData);
     for (int component = 0; component < 11; ++component)
     {
         rhs[point, component] =
@@ -8152,23 +8165,7 @@ void theory33FullOutflowDirectionalRhsKernel(
     int following = vtBoundaryClampedNeighbor(
         point, axis, 1, nx, ny, nz
     );
-    float coefficientRight =
-        0.5 * (pathData[point, 0] + pathData[following, 0]);
-    float coefficientLeft =
-        0.5 * (pathData[point, 0] + pathData[previous, 0]);
-    float transportedRight =
-        0.5 * (pathData[point, 2] + pathData[following, 2]);
-    float transportedLeft =
-        0.5 * (pathData[point, 2] + pathData[previous, 2]);
-    float pathSource =
-        coefficientRight
-        * (pathData[following, 1] - pathData[point, 1])
-        + coefficientLeft
-        * (pathData[point, 1] - pathData[previous, 1])
-        + transportedRight
-        * (pathData[following, 3] - pathData[point, 3])
-        + transportedLeft
-        * (pathData[point, 3] - pathData[previous, 3]);
+    float pathSource = vtFullCarterPathSource(point, previous, following, pathData);
     for (int component = 0; component < 11; ++component)
     {
         float rightFlux = coordinate == count - 1

@@ -315,36 +315,44 @@
     "run_vulkan_puncture_mots.py": "a0826f26cbf5a76c6adbba79c4ed2a2cd99748204b2690782c951be8386779ed",
     "tesseract_cmc_fp64.slang": "0f49a90752249431b68e69e6c6f7d89379b7fa8ff8d307221540c9edfad46396",
     "tesseract_ctt_fp64.slang": "dc405c7a5f5ce3437e9facfbd2235c2e7172ddff443ed6f2f723d65d2a7153a9",
+    "tesseract_nr/production33.py": "f8b0b4b6f7fd21b0fac423be3de0fb8fafdc6cc85fee31b0f3e5e0dee4e60686",
     "tesseract_nr/vulkan_amr.py": "3bd863d3ddac080e5a8cc108332b1ec3e60588d0891891ef25ea31d31ae6eb71",
-    "tesseract_nr/vulkan_backend.py": "7a87604955cfdcf6421e4e8b4442196bad6c0011ee5b8cba77d038d1f1abd5ce",
+    "tesseract_nr/vulkan_backend.py": "eb4f30ef632fe7d6c51cd30979a2e90c3d702c642050d179b297616028c91f84",
     "tesseract_nr/vulkan_boundary.py": "d9302574299bc048d64572c375cc1d3aef66dba87763aee2c5f241d9b8c32b84",
     "tesseract_nr/vulkan_ccz4_vacuum.py": "038070861230f4357fe61720fd43de4acbcb0bf43eb8fbfdba13189800e0ce28",
     "tesseract_nr/vulkan_ctt.py": "9b4b05105d6b7bf40846e24b666bcf2c5d3132b310add149dc1bcef64ab69714",
     "tesseract_nr/vulkan_frontier.py": "27e31b82f8c1adf391db3d50cbeb4fdda70c9b362c8cf947e7c348c39a123a23",
     "tesseract_nr/vulkan_mots.py": "3ceef9a7f6971c7742430f50d0bac7142e630a7df32ad3f4d25b37df507e5596",
-    "tesseract_nr/vulkan_parity.py": "ab8c77dfd526b20ac1e8ac7dff969ed317ed55017ab49fa0dbea14adcf022320",
+    "tesseract_nr/vulkan_parity.py": "4627af67a47488c63ae0ec316bc8dd5e3b9fdca1f3e64f4dadc0a5398e61f029",
     "tesseract_nr/vulkan_tov.py": "a44ababa9b5e6662bc8bba31e03aeee7b5bf2431b86a5e32cb60bd9396291002",
-    "tesseract_nr/vulkan_validation.py": "3c15d0c88eb2942f06a0903d050822e0509aeab4573d26854252065e301cc971",
-    "tesseract_nr_gpu.slang": "6ce532b7b474919ad990167886501248b86c431c271afde68eac05796205083f",
+    "tesseract_nr/vulkan_validation.py": "02a6be1c900f0e47b79f0a68b1d3f909444c351e2b3d90ca2662b2574c576c04",
+    "tesseract_nr_gpu.slang": "5975425308594b9d0a3eb0ae8a8abc06f490b1076459a1cf9b3719a8f94e6e8e",
     "tesseract_tov_fp64.slang": "cdb7028520112391727ff46dbaf5f75a22a7f3d9f92c1eb9f7bba4223413fc09",
     "theory33_frozen_variants.json": "8ab3e8359686441402d3454fe3949af3642399d8a9e38145fed29299b01cf8a9",
     "theory33_qualified_frozen.slang": "10c3cf40409107790640984e8fd397286f112f570253f7c063f63612a98397e1"
   },
   "qualification": {
     "all_resident_artifacts_are_qualified": true,
-    "computational_source_copy_matches_reference": true,
     "every_declared_capability_has_evidence": true,
     "implementation_manifest_is_complete": true,
+    "reference_sources_have_no_unexpected_differences": true,
     "retained_original_surfaces_are_present": true
   },
   "qualified": true,
   "reference_source_audit": {
     "checked": true,
-    "content_mismatches": [],
+    "content_mismatches": [
+      "tesseract_nr/production33.py"
+    ],
+    "expected_divergences": {
+      "tesseract_nr/production33.py": "The full carrier momentum contraction includes transverse velocity components on reduced grids."
+    },
     "files_compared": 75,
-    "identical": true,
+    "identical": false,
+    "line_ending_only_differences": [],
     "missing_files": [],
-    "reference_root": "F:\\FORGE\\Tools\\TESSERACT"
+    "reference_root": "F:\\FORGE\\Tools\\TESSERACT",
+    "unexpected_content_mismatches": []
   },
   "schema": "vulkan-tesseract.capability-parity.v1",
   "scope": "All original computational capabilities, separated into resident Vulkan execution and intentionally retained offline training/oracle/postprocessing surfaces."

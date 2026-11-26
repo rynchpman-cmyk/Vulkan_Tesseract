@@ -28,6 +28,7 @@ FULL_CARTER_STATE_WIDTH = 11
 DRAG_DIAGNOSTIC_WIDTH = 8
 GEOMETRY_3D_WIDTH = 13
 PRINCIPAL_PATH_WIDTH = 4
+FULL_CARTER_FLUX_PATH_WIDTH = 8
 FULL_EIGEN_AUDIT_WIDTH = 6
 CCZ4_STATE_WIDTH = 31
 CCZ4_PROJECTION_AUDIT_WIDTH = 3
@@ -1621,7 +1622,7 @@ class VulkanTheory33MultidimensionalBackend:
         self._single_vector_stress_a = matrix(13)
         self._single_vector_stress_b = matrix(13)
         self._flux = matrix(11)
-        self._path = matrix(PRINCIPAL_PATH_WIDTH)
+        self._path = matrix(FULL_CARTER_FLUX_PATH_WIDTH)
         self._speed = scalar()
         self._interface = matrix(11)
         self._boundary_flux = matrix(11)
